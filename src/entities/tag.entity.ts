@@ -2,14 +2,9 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import type { Relation } from "typeorm";
-
-import { PostTag } from "@/entities/post-tag.entity";
-import type { PostTag as PostTagEntity } from "@/entities/post-tag.entity";
 
 @Entity({ name: "tags" })
 export class Tag {
@@ -29,9 +24,6 @@ export class Tag {
     unique: true,
   })
   slug!: string;
-
-  @OneToMany(() => PostTag, (postTag) => postTag.tag)
-  postTags!: Relation<PostTagEntity[]>;
 
   @CreateDateColumn({
     name: "created_at",

@@ -27,7 +27,7 @@ export class PostTag {
   @JoinColumn({ name: "post_id" })
   post!: Relation<PostEntity>;
 
-  @ManyToOne(() => Tag, (tag) => tag.postTags, {
+  @ManyToOne(() => Tag, {
     nullable: false,
     onDelete: "CASCADE",
   })
