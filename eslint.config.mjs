@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "node_modules/**",
+    // PM2: CommonJS + require(); not part of the TS/Next source tree.
+    "ecosystem.config.cjs",
   ]),
 ]);
 
