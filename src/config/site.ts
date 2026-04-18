@@ -1,9 +1,9 @@
 export const siteConfig = {
   name: "Nham Blog",
   title: "Nham Blog",
-  heading: "Blog foundation is ready for the next implementation tasks.",
+  heading: "Blog foundation and shadcn/ui setup are ready for implementation.",
   description:
-    "Scaffolded with Next.js App Router, wired for Yarn workflows, and organized for the upcoming TypeORM, auth, and CMS features.",
+    "Scaffolded with Next.js App Router, wired for Yarn workflows, validated with Zod, and prepared for TypeORM, auth, and a shadcn/ui-based admin experience.",
   locale: "vi",
 } as const;
 
@@ -24,6 +24,7 @@ export const foundationChecklist = [
   "Next.js App Router + TypeScript bootstrapped with Yarn.",
   "ESLint, Prettier, and typecheck scripts are available and passing.",
   "Alias imports via @/ are active in app code and test smoke files.",
+  "shadcn/ui is initialized with Tailwind v4 support and src-based aliases.",
 ] as const;
 
 export const plannedDirectories = [
@@ -32,12 +33,24 @@ export const plannedDirectories = [
     description: "Reusable UI components and route-specific presentation pieces.",
   },
   {
+    name: "src/components/ui",
+    description: "Generated and customized shadcn/ui primitives.",
+  },
+  {
     name: "src/db",
     description: "Database connection setup and TypeORM datasource configuration.",
   },
   {
     name: "src/entities",
     description: "TypeORM entity definitions for posts, tags, users, and media.",
+  },
+  {
+    name: "src/hooks",
+    description: "Shared React hooks and shadcn/ui-compatible helpers.",
+  },
+  {
+    name: "src/lib",
+    description: "Low-level utilities such as class merging helpers.",
   },
   {
     name: "src/services",

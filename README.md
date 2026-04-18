@@ -10,29 +10,38 @@ yarn dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
 
 ## Project Structure
 
-- `app/`: Next.js App Router entrypoints and route segments.
+- `src/app/`: Next.js App Router entrypoints and route segments.
 - `src/components/`: shared and route-level React components.
 - `src/components/ui/`: generated and customized primitives from `shadcn/ui`.
 - `src/config/`: site metadata and non-secret app configuration.
-- `src/db/`: database connection and TypeORM datasource setup.
-- `src/entities/`: TypeORM entities.
+- `src/db/`: lazy TypeORM datasource setup plus future migrations and subscribers.
+- `src/entities/`: TypeORM entities and the shared entity registry. The current entities are `User`, `Post`, `Tag`, `PostTag`, and `MediaAsset`.
 - `src/services/`: business logic and orchestration helpers.
 - `src/validators/`: request and form validation schemas.
 - `tests/`: smoke, integration, and end-to-end test entrypoints.
 
-Alias imports use `@/`, so `@/src/config/site` resolves from the repository root.
+Alias imports use `@/`, so `@/config/site` resolves from the `src/` directory.
 
 UI components are standardized on `shadcn/ui`.
+The generator is initialized and configured through [components.json](/home/nham/workspace/nham-blog/components.json), targeting `src/components/ui` and `src/lib/utils.ts`.
 
 ## Environment
 
 - Runtime environment variables are validated in [src/env.ts](/home/nham/workspace/nham-blog/src/env.ts) during Next.js boot.
 - Tracked defaults and required keys live in [`.env.example`](/home/nham/workspace/nham-blog/.env.example).
 - Local development values can live in `.env.local` and are ignored by git.
+- `DATABASE_URL` becomes required as soon as the database layer calls [src/db/data-source.ts](/home/nham/workspace/nham-blog/src/db/data-source.ts).
+
+## Database Migrations
+
+- Run migrations: `yarn migration:run`
+- Revert the latest migration: `yarn migration:revert`
+- Seed admin user and starter tags: `yarn seed`
+- Reset the admin password from env vars: `yarn admin:reset-password`
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

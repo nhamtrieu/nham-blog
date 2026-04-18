@@ -1,0 +1,70 @@
+import { v2 as cloudinary } from "cloudinary";
+
+import { env } from "@/env";
+
+export const CLOUDINARY_UPLOAD_FOLDER = "nham-blog/admin";
+export const CLOUDINARY_UPLOAD_RESOURCE_TYPE = "image";
+
+type CloudinaryConfig = {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+};
+
+export type SignedUploadPayload = {
+  apiKey: string;
+  cloudName: string;
+  folder: string;
+  resourceType: typeof CLOUDINARY_UPLOAD_RESOURCE_TYPE;
+  signature: string;
+  timestamp: number;
+  uploadUrl: string;
+};
+
+function getCloudinaryConfig(): CloudinaryConfig | null {
+  if (
+    !env.CLOUDINARY_CLOUD_NAME ||
+    !env.CLOUDINARY_API_KEY ||
+    !env.CLOUDINARY_API_SECRET
+  ) {
+    return null;
+  }
+
+  return {
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    apiSecret: env.CLOUDINARY_API_SECRET,
+  };
+}
+
+export function isCloudinaryConfigured() {
+  return getCloudinaryConfig() !== null;
+}
+
+export function createSignedUploadPayload(
+  timestamp = Math.floor(Date.now() / 1000)
+): SignedUploadPayload {
+  const config = getCloudinaryConfig();
+
+  if (!config) {
+    throw new Error("Cloudinary is not configured.");
+  }
+
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      folder: CLOUDINARY_UPLOAD_FOLDER,
+      timestamp: String(timestamp),
+    },
+    config.apiSecret
+  );
+
+  return {
+    apiKey: config.apiKey,
+    cloudName: config.cloudName,
+    folder: CLOUDINARY_UPLOAD_FOLDER,
+    resourceType: CLOUDINARY_UPLOAD_RESOURCE_TYPE,
+    signature,
+    timestamp,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${config.cloudName}/${CLOUDINARY_UPLOAD_RESOURCE_TYPE}/upload`,
+  };
+}

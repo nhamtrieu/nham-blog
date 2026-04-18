@@ -18,8 +18,8 @@ Xem breakdown task triển khai chi tiết tại: [BLOG_IMPLEMENTATION_TASKS.md]
 ## 2) Thiết Kế Kỹ Thuật & Interface Chính
 
 - Cấu trúc module chính:
-  - `app/(public)` cho trang người đọc (home, post detail, tag listing).
-  - `app/(admin)` cho dashboard và quản lý nội dung.
+  - `src/app/(public)` cho trang người đọc (home, post detail, tag listing).
+  - `src/app/(admin)` cho dashboard và quản lý nội dung.
   - `src/components/ui/*` cho các component được generate từ `shadcn/ui`.
   - `src/entities/*` + `src/db/data-source.ts` cho toàn bộ model dữ liệu và cấu hình kết nối DB.
 
