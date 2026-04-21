@@ -50,15 +50,16 @@ export class MediaAsset {
   @Column({
     name: "uploaded_by_id",
     type: "uuid",
+    nullable: true,
   })
-  uploadedById!: string;
+  uploadedById!: string | null;
 
   @ManyToOne(() => User, (user) => user.mediaAssets, {
-    nullable: false,
-    onDelete: "RESTRICT",
+    nullable: true,
+    onDelete: "SET NULL",
   })
   @JoinColumn({ name: "uploaded_by_id" })
-  uploadedBy!: Relation<UserEntity>;
+  uploadedBy!: Relation<UserEntity> | null;
 
   @CreateDateColumn({
     name: "created_at",

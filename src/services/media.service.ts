@@ -24,7 +24,7 @@ export type MediaAssetRecord = {
   alt: string | null;
   width: number;
   height: number;
-  uploadedById: string;
+  uploadedById: string | null;
   createdAt: Date;
 };
 
