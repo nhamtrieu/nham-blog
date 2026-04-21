@@ -102,7 +102,7 @@ export class Post {
   authorId!: string;
 
   @ManyToOne(() => User, (user) => user.posts, {
-    nullable: false,
+    nullable: true,
     onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "author_id" })
