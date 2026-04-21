@@ -22,6 +22,8 @@ import {
   Upload,
 } from "lucide-react";
 
+import { DeletePostButton } from "@/components/admin/delete-post-button";
+import { MdxCodeEditor } from "@/components/admin/mdx-code-editor";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -862,6 +864,14 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
               {isBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
               {mode === "create" ? "Tạo bài viết" : "Lưu thay đổi"}
             </Button>
+            {mode === "edit" && currentPost ? (
+              <DeletePostButton
+                postId={currentPost.id}
+                postTitle={currentPost.title}
+                size="lg"
+                variant="outline"
+              />
+            ) : null}
           </div>
         </div>
 
@@ -1017,12 +1027,10 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                     Ảnh sẽ được upload Cloudinary, lưu metadata vào DB, rồi chèn link vào MDX.
                   </span>
                 </div>
-                <Textarea
-                  aria-invalid={Boolean(getFieldError("contentMdx"))}
-                  className="min-h-[24rem] font-mono text-[0.95rem] leading-7"
+                <MdxCodeEditor
+                  className={cn(Boolean(getFieldError("contentMdx")) && "rounded-xl ring-2 ring-destructive/40")}
                   id="contentMdx"
-                  onChange={(event) => updateField("contentMdx", event.target.value)}
-                  placeholder={"# Bài viết mới\n\nViết nội dung MDX tại đây..."}
+                  onChange={(value) => updateField("contentMdx", value)}
                   value={formValues.contentMdx}
                 />
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">

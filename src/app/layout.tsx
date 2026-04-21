@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import { env } from "@/env";
 import { siteConfig } from "@/config/site";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const roboto = Roboto({
@@ -23,7 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang={siteConfig.locale} className={roboto.variable}>
-      <body className="min-h-dvh bg-background font-sans text-foreground antialiased">{children}</body>
+      <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
+        {children}
+        <Toaster richColors />
+      </body>
     </html>
   );
 }

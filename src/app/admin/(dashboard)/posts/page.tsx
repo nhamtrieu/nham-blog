@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FilePenLine, FileText, PlusCircle } from "lucide-react";
 
 import { AdminPostsFilterForm } from "@/components/admin/admin-posts-filter-form";
+import { DeletePostButton } from "@/components/admin/delete-post-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -209,7 +210,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
                             </Link>
                             <div className="flex shrink-0 flex-wrap items-center gap-2">
                               <Badge
-                                className="max-w-48 truncate border-transparent bg-muted px-2.5 py-1 text-muted-foreground"
+                                className="h-7 max-w-48 truncate border-transparent bg-muted px-2.5 text-muted-foreground"
                                 variant="secondary"
                               >
                                 {post.slug}
@@ -223,6 +224,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
                                 <FilePenLine className="size-3.5" />
                                 Edit
                               </Button>
+                              <DeletePostButton postId={post.id} postTitle={post.title} />
                             </div>
                           </div>
                           <p className="max-w-xl pt-1 text-sm text-muted-foreground leading-relaxed sm:pt-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Filter, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +34,19 @@ export function AdminPostsFilterForm({
   resetHref,
   statusOptions,
 }: AdminPostsFilterFormProps) {
+  const [statusValue, setStatusValue] = useState(defaultStatus);
+
+  useEffect(() => {
+    setStatusValue(defaultStatus);
+  }, [defaultStatus]);
+
   return (
     <form className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-4" method="get">
       <div className="relative min-w-0 flex-1 lg:max-w-md xl:max-w-lg">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           aria-label="Tim bai viet theo title"
-          className="pl-10"
+          className="h-10 pl-10"
           defaultValue={defaultSearch}
           name="q"
           placeholder="Tim theo title..."
@@ -49,11 +56,17 @@ export function AdminPostsFilterForm({
 
       <div className="relative w-full min-w-0 shrink-0 lg:w-56">
         <Filter className="pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Select defaultValue={defaultStatus} name="status">
+        <Select
+          name="status"
+          onValueChange={(value) => {
+            setStatusValue(value ?? "ALL");
+          }}
+          value={statusValue}
+        >
           <SelectTrigger
             aria-label="Loc bai viet theo status"
-            className="h-10 w-full min-w-0 border-border pl-10 shadow-xs"
-            size="default"
+            className="w-full min-w-0 border-border pl-10 shadow-xs"
+            size="lg"
           >
             <SelectValue placeholder="Trang thai" />
           </SelectTrigger>
