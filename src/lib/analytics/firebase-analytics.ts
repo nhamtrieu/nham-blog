@@ -1,4 +1,3 @@
-import { env } from "@/env";
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -8,18 +7,16 @@ function isLocalHostname(hostname: string) {
 }
 
 export const shouldEnableFirebaseAnalytics =
-  env.NODE_ENV === "production" &&
-  Boolean(env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID) &&
-  !isLocalHostname(new URL(env.APP_URL).hostname);
+  process.env.NODE_ENV === "production" && Boolean(process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
 
 export const firebaseConfig = {
-  apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 export function getFirebaseApp(): FirebaseApp {
