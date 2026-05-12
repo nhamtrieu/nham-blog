@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export default async function AdminLoginPage() {
   const session = await getServerAuthSession();
 
-  if (session?.user) {
+  if (session?.user?.role === "ADMIN") {
     redirect(ADMIN_HOME_PATH);
   }
 

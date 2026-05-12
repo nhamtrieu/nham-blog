@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getServerAuthSession } from "@/auth";
 import { jsonError, unauthorizedJson } from "@/lib/api/api-errors";
+import { isAdminSession } from "@/lib/auth/authorization";
 import {
   createSignedUploadPayload,
   isCloudinaryConfigured,
@@ -10,7 +11,7 @@ import {
 export async function POST() {
   const session = await getServerAuthSession();
 
-  if (!session?.user?.id) {
+  if (!isAdminSession(session)) {
     return unauthorizedJson();
   }
 

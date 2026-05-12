@@ -26,7 +26,7 @@ export default withAuth(
           return true;
         }
 
-        return Boolean(token);
+        return token?.role === "ADMIN";
       },
     },
   }

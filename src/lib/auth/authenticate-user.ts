@@ -3,12 +3,14 @@ import { ILike } from "typeorm";
 
 import { initializeDataSource } from "@/db/data-source";
 import { User } from "@/entities";
+import type { UserRole } from "@/entities/user.entity";
 import type { SignInCredentials } from "@/lib/auth/sign-in-credentials";
 
 export type AuthenticatedUser = {
   id: string;
   email: string;
   name: string | null;
+  role: UserRole;
 };
 
 export async function authenticateUserWithCredentials(
@@ -37,5 +39,6 @@ export async function authenticateUserWithCredentials(
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
   };
 }

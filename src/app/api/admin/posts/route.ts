@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { isAdminSession } from "@/lib/auth/authorization";
 import { postService } from "@/services";
 import { validatePostCreateInput } from "@/validators/post.validator";
 
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerAuthSession();
 
-    if (!session?.user?.id) {
+    if (!isAdminSession(session)) {
       return unauthorizedJson();
     }
 

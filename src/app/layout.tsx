@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import { env } from "@/env";
 import { siteConfig } from "@/config/site";
+import { FirebaseAnalytics } from "@/components/analytics/firebase-analytics";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
         {children}
         <Toaster richColors />
+        <FirebaseAnalytics />
       </body>
     </html>
   );

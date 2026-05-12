@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Home, ImageIcon, Tags } from "lucide-react";
+import { FileText, Home, ImageIcon, MessageSquare, Tags } from "lucide-react";
 
 import {
   SidebarGroup,
@@ -37,6 +37,12 @@ const adminNavItems = [
     label: "Media",
     description: "Kho ảnh upload",
     icon: ImageIcon,
+  },
+  {
+    href: "/admin/comments",
+    label: "Comments",
+    description: "Duyệt bình luận",
+    icon: MessageSquare,
   },
 ] as const;
 

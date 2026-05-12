@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 
 import { createDataSource } from "@/db/data-source";
 import { User } from "@/entities";
+import { UserRole } from "@/entities/user.entity";
 import { env } from "@/env";
 
 async function resetAdminPassword() {
@@ -25,6 +26,7 @@ async function resetAdminPassword() {
       { id: user.id },
       {
         passwordHash,
+        role: UserRole.ADMIN,
       }
     );
 

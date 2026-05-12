@@ -2,6 +2,7 @@ import { getServerSession, type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 import { env } from "@/env";
+import { UserRole } from "@/entities/user.entity";
 import { authenticateUserWithCredentials } from "@/lib/auth/authenticate-user";
 import { ADMIN_LOGIN_PATH } from "@/lib/auth/auth-routes";
 import {
@@ -71,6 +72,7 @@ export const authOptions = {
         token.userId = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.role = user.role;
       }
 
       return token;
@@ -87,6 +89,7 @@ export const authOptions = {
           typeof token.email === "string" ? token.email : session.user.email ?? "";
         session.user.name =
           typeof token.name === "string" ? token.name : session.user.name ?? null;
+        session.user.role = token.role ?? UserRole.READER;
       }
 
       return session;

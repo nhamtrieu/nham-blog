@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 
 import { createDataSource } from "@/db/data-source";
 import { Tag, User } from "@/entities";
+import { UserRole } from "@/entities/user.entity";
 import { env } from "@/env";
 
 const DEFAULT_TAGS = [
@@ -30,6 +31,7 @@ async function seedAdmin() {
         {
           name: env.ADMIN_NAME,
           passwordHash,
+          role: UserRole.ADMIN,
         }
       );
       console.log(`Updated admin user: ${env.ADMIN_EMAIL}`);
@@ -38,6 +40,7 @@ async function seedAdmin() {
         email: env.ADMIN_EMAIL,
         name: env.ADMIN_NAME,
         passwordHash,
+        role: UserRole.ADMIN,
       });
       console.log(`Created admin user: ${env.ADMIN_EMAIL}`);
     }

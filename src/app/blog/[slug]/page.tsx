@@ -7,6 +7,8 @@ import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 import type { ComponentPropsWithoutRef } from "react";
 
+import { getServerAuthSession } from "@/auth";
+import { CommentSection, type PublicCommentView } from "@/components/blog/comment-section";
 import { PostShareLinks } from "@/components/blog/post-share-links";
 import { PostTableOfContents } from "@/components/blog/post-table-of-contents";
 import { loadPublishedPostBySlug } from "@/app/blog/[slug]/load-published-post";
@@ -14,7 +16,7 @@ import { env } from "@/env";
 import { absoluteUrl } from "@/lib/absolute-url";
 import { extractMdxHeadings } from "@/lib/mdx-headings";
 import { cn } from "@/lib/utils";
-import { SERVICE_ERROR_CODES, isServiceError } from "@/services";
+import { SERVICE_ERROR_CODES, commentService, isServiceError } from "@/services";
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -259,6 +261,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   })();
   const { post, content, tocItems } = pageData;
   const postUrl = absoluteUrl(`/blog/${post.slug}`);
+  const [initialComments, session] = await Promise.all([
+    commentService.listApprovedCommentsForPostSlug({ slug: post.slug }),
+    getServerAuthSession(),
+  ]);
+  const commentViews: PublicCommentView[] = initialComments.items.map((comment) => ({
+    id: comment.id,
+    content: comment.content,
+    createdAt: comment.createdAt.toISOString(),
+    author: comment.author,
+  }));
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -315,6 +327,20 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           ) : null}
 
           <div className="mt-8 border-t border-slate-200 pt-6">{content}</div>
+
+          <CommentSection
+            currentUser={
+              session?.user?.id
+                ? {
+                  id: session.user.id,
+                  name: session.user.name,
+                }
+                : null
+            }
+            initialComments={commentViews}
+            loginHref={`/login?callbackUrl=${encodeURIComponent(`/blog/${post.slug}`)}`}
+            slug={post.slug}
+          />
         </article>
 
         {tocItems.length > 0 ? (

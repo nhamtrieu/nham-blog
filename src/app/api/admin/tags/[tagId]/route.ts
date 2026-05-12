@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { isAdminSession } from "@/lib/auth/authorization";
 import { tagService } from "@/services";
 import { validateTagUpdateInput } from "@/validators/tag.validator";
 
@@ -27,7 +28,7 @@ export async function PATCH(request: Request, { params }: TagRouteContext) {
   try {
     const session = await getServerAuthSession();
 
-    if (!session?.user?.id) {
+    if (!isAdminSession(session)) {
       return unauthorizedJson();
     }
 
@@ -78,7 +79,7 @@ export async function DELETE(_request: Request, { params }: TagRouteContext) {
   try {
     const session = await getServerAuthSession();
 
-    if (!session?.user?.id) {
+    if (!isAdminSession(session)) {
       return unauthorizedJson();
     }
 

@@ -10,8 +10,10 @@ import {
 } from "typeorm";
 import type { Relation } from "typeorm";
 
+import { Comment } from "@/entities/comment.entity";
 import { PostTag } from "@/entities/post-tag.entity";
 import { User } from "@/entities/user.entity";
+import type { Comment as CommentEntity } from "@/entities/comment.entity";
 import type { PostTag as PostTagEntity } from "@/entities/post-tag.entity";
 import type { User as UserEntity } from "@/entities/user.entity";
 
@@ -110,6 +112,9 @@ export class Post {
 
   @OneToMany(() => PostTag, (postTag) => postTag.post)
   postTags!: Relation<PostTagEntity[]>;
+
+  @OneToMany(() => Comment, (comment) => comment.post)
+  comments!: Relation<CommentEntity[]>;
 
   @CreateDateColumn({
     name: "created_at",
