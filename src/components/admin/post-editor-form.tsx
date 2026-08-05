@@ -65,6 +65,11 @@ type PostEditorFormProps = {
   availableTags: PostEditorTagOption[];
   initialData?: PostEditorInitialData;
   mode: "create" | "edit";
+  variant?: "admin" | "writer";
+  postsListHref?: string;
+  postsApiBasePath?: string;
+  mediaSignPath?: string;
+  mediaSavePath?: string;
 };
 
 type PostEditorFormValues = {
@@ -164,22 +169,30 @@ function createInitialFormValues(initialData?: PostEditorInitialData): PostEdito
   };
 }
 
-function createSavePayload(formValues: PostEditorFormValues) {
-  return {
+function createSavePayload(formValues: PostEditorFormValues, omitPublishFields = false) {
+  const payload = {
     title: formValues.title,
     slug: formValues.slug,
     excerpt: formValues.excerpt,
     contentMdx: formValues.contentMdx,
     coverImageUrl: formValues.coverImageUrl,
-    status: formValues.status,
     seoTitle: formValues.seoTitle,
     seoDescription: formValues.seoDescription,
     tagIds: formValues.tagIds,
   };
+
+  if (omitPublishFields) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    status: formValues.status,
+  };
 }
 
-function serializeFormValues(formValues: PostEditorFormValues) {
-  return JSON.stringify(createSavePayload(formValues));
+function serializeFormValues(formValues: PostEditorFormValues, omitPublishFields = false) {
+  return JSON.stringify(createSavePayload(formValues, omitPublishFields));
 }
 
 function hasRequiredDraftFields(formValues: PostEditorFormValues) {
@@ -264,7 +277,7 @@ function Field({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-black/20 p-4 sm:p-5",
+        "min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5",
         className
       )}
     >
@@ -315,10 +328,20 @@ function FieldError({ message }: { message?: string }) {
     return null;
   }
 
-  return <p className="mt-2 text-sm text-rose-300">{message}</p>;
+  return <p className="mt-2 text-sm text-destructive">{message}</p>;
 }
 
-export function PostEditorForm({ availableTags, initialData, mode }: PostEditorFormProps) {
+export function PostEditorForm({
+  availableTags,
+  initialData,
+  mode,
+  variant = "admin",
+  postsListHref = "/admin/posts",
+  postsApiBasePath = "/api/admin/posts",
+  mediaSignPath = "/api/admin/media/sign",
+  mediaSavePath = "/api/admin/media",
+}: PostEditorFormProps) {
+  const isWriterVariant = variant === "writer";
   const router = useRouter();
   const [isRouting, startTransition] = useTransition();
   const [formValues, setFormValues] = useState(() => createInitialFormValues(initialData));
@@ -343,7 +366,9 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
     ((trigger: SaveTrigger, valuesOverride?: PostEditorFormValues) => Promise<boolean>) | null
   >(null);
   const lastSavedSnapshotRef = useRef<string | null>(
-    initialData ? serializeFormValues(createInitialFormValues(initialData)) : null
+    initialData
+      ? serializeFormValues(createInitialFormValues(initialData), isWriterVariant)
+      : null
   );
 
   const wordCount = countWordsInMdx(formValues.contentMdx);
@@ -401,7 +426,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
     setCurrentPost(normalizedPost);
     setFormValues(nextFormValues);
     setFieldErrors({});
-    lastSavedSnapshotRef.current = serializeFormValues(nextFormValues);
+    lastSavedSnapshotRef.current = serializeFormValues(nextFormValues, isWriterVariant);
   }
 
   function getFieldError(fieldName: keyof PostEditorFormValues | "tagIds") {
@@ -421,7 +446,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
     const isCreatingPost = !currentPost;
 
     if (trigger === "autosave") {
-      if (values.status !== PostStatus.DRAFT) {
+      if (!isWriterVariant && values.status !== PostStatus.DRAFT) {
         return false;
       }
 
@@ -459,15 +484,16 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
     }
 
     try {
-      const endpoint =
-        isCreatingPost ? "/api/admin/posts" : `/api/admin/posts/${currentPost?.id ?? ""}`;
+      const endpoint = isCreatingPost
+        ? postsApiBasePath
+        : `${postsApiBasePath}/${currentPost?.id ?? ""}`;
       const method = isCreatingPost ? "POST" : "PATCH";
       const response = await fetch(endpoint, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(createSavePayload(values)),
+        body: JSON.stringify(createSavePayload(values, isWriterVariant)),
         signal: autoSaveController?.signal,
       });
       const responseBody = await parseJsonResponse<SavedPostResponse | ApiErrorResponse>(response);
@@ -499,12 +525,12 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
 
       const savedPost = responseBody as SavedPostResponse;
       applySavedPost(savedPost);
-      setSaveMessage(`Da luu luc ${formatDateTime(savedPost.updatedAt)}`);
+      setSaveMessage(`Đã lưu lúc ${formatDateTime(savedPost.updatedAt)}`);
       setAutoSaveState("idle");
 
       if (isCreatingPost) {
         startTransition(() => {
-          router.replace(`/admin/posts/${savedPost.id}`);
+          router.replace(`${postsListHref}/${savedPost.id}`);
           router.refresh();
         });
         return true;
@@ -547,7 +573,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
   persistPostRef.current = persistPost;
 
   useEffect(() => {
-    if (formValues.status !== PostStatus.DRAFT) {
+    if (!isWriterVariant && formValues.status !== PostStatus.DRAFT) {
       setAutoSaveState("idle");
       return;
     }
@@ -560,7 +586,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
       return;
     }
 
-    const serializedFormValues = serializeFormValues(formValues);
+    const serializedFormValues = serializeFormValues(formValues, isWriterVariant);
 
     if (lastSavedSnapshotRef.current === serializedFormValues) {
       setAutoSaveState("idle");
@@ -582,7 +608,14 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
         autoSaveTimerRef.current = null;
       }
     };
-  }, [currentPost, formValues, isAutoSaving, isRouting, isSubmitting]);
+  }, [
+    currentPost,
+    formValues,
+    isAutoSaving,
+    isRouting,
+    isSubmitting,
+    isWriterVariant,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -674,7 +707,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
     const fallbackAltText = deriveImageAltText(file.name);
 
     try {
-      const signResponse = await fetch("/api/admin/media/sign", {
+      const signResponse = await fetch(mediaSignPath, {
         method: "POST",
       });
       const signResponseBody = await parseJsonResponse<
@@ -737,7 +770,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
         return;
       }
 
-      const saveMediaResponse = await fetch("/api/admin/media", {
+      const saveMediaResponse = await fetch(mediaSavePath, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -804,7 +837,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
   }
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
+    <form className="min-w-0 w-full max-w-full space-y-6 overflow-x-hidden" onSubmit={handleSubmit}>
       <input
         accept="image/*"
         className="hidden"
@@ -824,10 +857,10 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
         type="file"
       />
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur-sm sm:p-8">
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/15 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-primary-foreground">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-primary">
               <FilePenLine className="size-3.5" />
               {mode === "create" ? "Tạo bài viết" : "Chỉnh sửa bài viết"}
             </div>
@@ -836,8 +869,9 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 {mode === "create" ? "Tạo bài viết mới" : "Chỉnh sửa bài viết"}
               </h2>
               <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Form này đang nối trực tiếp vào admin APIs cho post create và update. Auto-save
-                draft, publish toggle và media upload đã sẵn sàng cho workflow editor.
+                {isWriterVariant
+                  ? "Lưu draft tại đây. Admin sẽ publish bài khi sẵn sàng. Bạn không thể tự publish."
+                  : "Form này đang nối trực tiếp vào admin APIs cho post create và update. Auto-save draft, publish toggle và media upload đã sẵn sàng cho workflow editor."}
               </p>
             </div>
           </div>
@@ -851,7 +885,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 }),
                 "rounded-2xl border-border bg-muted/40 px-5 text-foreground hover:bg-muted/70"
               )}
-              href="/admin/posts"
+              href={postsListHref}
             >
               Quay lại danh sách
             </Link>
@@ -866,8 +900,10 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
             </Button>
             {mode === "edit" && currentPost ? (
               <DeletePostButton
+                deleteUrl={`${postsApiBasePath}/${currentPost.id}`}
                 postId={currentPost.id}
                 postTitle={currentPost.title}
+                redirectTo={postsListHref}
                 size="lg"
                 variant="outline"
               />
@@ -880,8 +916,8 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
             className={cn(
               "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em]",
               formValues.status === PostStatus.PUBLISHED
-                ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
-                : "border-amber-300/20 bg-amber-300/10 text-amber-100"
+                ? "border-emerald-600/25 bg-emerald-500/10 text-emerald-700 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100"
+                : "border-amber-600/25 bg-amber-500/10 text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/10 dark:text-amber-100"
             )}
           >
             {formValues.status}
@@ -891,7 +927,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
             {readingTime > 0 ? `${readingTime} phút đọc` : "Chưa có thời gian đọc"}
           </span>
           {saveMessage ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-xs text-emerald-100">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-600/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-700 dark:border-emerald-300/15 dark:bg-emerald-300/10 dark:text-emerald-100">
               <Check className="size-3.5" />
               {saveMessage}
             </span>
@@ -901,8 +937,8 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
               className={cn(
                 "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs",
                 autoSaveState === "error"
-                  ? "border-rose-300/20 bg-rose-300/10 text-rose-100"
-                  : "border-primary/30 bg-primary/15 text-primary-foreground"
+                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                  : "border-primary/30 bg-primary/10 text-primary"
               )}
             >
               {autoSaveState === "saving" ? (
@@ -922,29 +958,30 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
       </section>
 
       {formMessage ? (
-        <div className="rounded-xl border border-rose-300/20 bg-rose-300/10 px-5 py-4 text-sm text-rose-100">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {formMessage}
         </div>
       ) : null}
       {mediaMessage ? (
-        <div className="rounded-xl border border-primary/30 bg-primary/15 px-5 py-4 text-sm text-primary-foreground">
+        <div className="rounded-xl border border-primary/30 bg-primary/10 px-5 py-4 text-sm text-primary">
           {mediaMessage}
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        <div className="min-w-0 max-w-full space-y-6 overflow-hidden">
           <Field>
             <FieldHeader
               description="Phần nội dung chính của bài viết, bao gồm title, slug, excerpt và MDX body."
               title="Nội dung bài viết"
             />
 
-            <div className="grid gap-5">
-              <div>
+            <div className="grid min-w-0 gap-5">
+              <div className="min-w-0">
                 <FieldLabel htmlFor="title" hint="Bắt buộc" label="Tiêu đề" />
                 <Input
                   aria-invalid={Boolean(getFieldError("title"))}
+                  className="max-w-full"
                   id="title"
                   onChange={(event) => updateField("title", event.target.value)}
                   placeholder="VD: Cách xây dựng CMS nhỏ gọn cho blog cá nhân"
@@ -953,8 +990,8 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 <FieldError message={getFieldError("title")} />
               </div>
 
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
                   <label
                     className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground"
                     htmlFor="slug"
@@ -962,7 +999,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                     Slug (URL)
                   </label>
                   <button
-                    className="inline-flex items-center gap-2 text-xs font-medium text-primary-foreground transition hover:text-primary-foreground/90"
+                    className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-primary transition hover:text-primary/80"
                     onClick={(event) => {
                       event.preventDefault();
                       updateField("slug", formValues.title.trim().length > 0 ? slugify(formValues.title) : "");
@@ -975,6 +1012,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 </div>
                 <Input
                   aria-invalid={Boolean(getFieldError("slug"))}
+                  className="max-w-full"
                   id="slug"
                   onChange={(event) => updateField("slug", event.target.value)}
                   placeholder="bo-trong-de-server-tu-sinh-slug"
@@ -986,11 +1024,11 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 <FieldError message={getFieldError("slug")} />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <FieldLabel htmlFor="excerpt" hint={`${formValues.excerpt.length}/500`} label="Tóm tắt" />
                 <Textarea
                   aria-invalid={Boolean(getFieldError("excerpt"))}
-                  className="min-h-28"
+                  className="min-h-28 max-w-full"
                   id="excerpt"
                   onChange={(event) => updateField("excerpt", event.target.value)}
                   placeholder="Tóm tắt ngắn gọn để hiển thị trong danh sách bài viết và SEO."
@@ -999,7 +1037,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 <FieldError message={getFieldError("excerpt")} />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <FieldLabel
                   htmlFor="contentMdx"
                   hint={`${wordCount} từ`}
@@ -1028,7 +1066,11 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                   </span>
                 </div>
                 <MdxCodeEditor
-                  className={cn(Boolean(getFieldError("contentMdx")) && "rounded-xl ring-2 ring-destructive/40")}
+                  appearance={isWriterVariant ? "auto" : "dark"}
+                  className={cn(
+                    "min-w-0 max-w-full",
+                    Boolean(getFieldError("contentMdx")) && "rounded-xl ring-2 ring-destructive/40"
+                  )}
                   id="contentMdx"
                   onChange={(value) => updateField("contentMdx", value)}
                   value={formValues.contentMdx}
@@ -1047,8 +1089,8 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
               title="Meta và SEO"
             />
 
-            <div className="grid gap-5">
-              <div>
+            <div className="grid min-w-0 gap-5">
+              <div className="min-w-0">
                 <FieldLabel
                   htmlFor="coverImageUrl"
                   label="URL ảnh cover"
@@ -1077,6 +1119,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 </div>
                 <Input
                   aria-invalid={Boolean(getFieldError("coverImageUrl"))}
+                  className="max-w-full"
                   id="coverImageUrl"
                   onChange={(event) => updateField("coverImageUrl", event.target.value)}
                   placeholder="https://images.example.com/cover.jpg"
@@ -1118,68 +1161,89 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
           </Field>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 max-w-full space-y-6 xl:sticky xl:top-4 xl:self-start">
           <Field>
             <FieldHeader
-              description="Điều khiển trạng thái publish và theo dõi metadata hiện tại của bài viết."
-              title="Publish"
+              description={
+                isWriterVariant
+                  ? "Trạng thái publish do admin quản lý. Bạn chỉ lưu nội dung draft."
+                  : "Điều khiển trạng thái publish và theo dõi metadata hiện tại của bài viết."
+              }
+              title={isWriterVariant ? "Trạng thái" : "Publish"}
             />
 
             <div className="space-y-5">
-              <div className="rounded-xl border border-border bg-muted/30 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Hành động nhanh
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {formValues.status === PostStatus.PUBLISHED
-                    ? "Unpublish sẽ đưa bài viết về Draft và xóa thời gian publish hiện tại."
-                    : "Publish sẽ công khai bài viết và đặt thời gian publish theo server rules."}
-                </p>
-                <Button
-                  className={cn(
-                    "mt-4 w-full rounded-xl",
-                    formValues.status === PostStatus.PUBLISHED
-                      ? "border-rose-300/25 bg-rose-300/10 text-rose-100 hover:bg-rose-300/20"
-                      : "bg-emerald-300 text-emerald-950 hover:bg-emerald-200"
-                  )}
-                  disabled={isBusy}
-                  onClick={() => {
-                    void handleTogglePublish();
-                  }}
-                  type="button"
-                  variant={formValues.status === PostStatus.PUBLISHED ? "outline" : "default"}
-                >
-                  {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
-                  {formValues.status === PostStatus.PUBLISHED ? "Unpublish" : "Publish"}
-                </Button>
-              </div>
+              {isWriterVariant ? (
+                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Draft workflow
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Bài viết của bạn được lưu dưới dạng draft. Admin sẽ publish khi nội dung sẵn sàng.
+                    Trạng thái hiện tại: <span className="font-medium text-foreground">{formValues.status}</span>
+                    {currentPost?.publishedAt
+                      ? ` · đã publish lúc ${formatDateTime(currentPost.publishedAt)}`
+                      : null}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-border bg-muted/30 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Hành động nhanh
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {formValues.status === PostStatus.PUBLISHED
+                        ? "Unpublish sẽ đưa bài viết về Draft và xóa thời gian publish hiện tại."
+                        : "Publish sẽ công khai bài viết và đặt thời gian publish theo server rules."}
+                    </p>
+                    <Button
+                      className={cn(
+                        "mt-4 w-full rounded-xl",
+                        formValues.status === PostStatus.PUBLISHED
+                          ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                      )}
+                      disabled={isBusy}
+                      onClick={() => {
+                        void handleTogglePublish();
+                      }}
+                      type="button"
+                      variant={formValues.status === PostStatus.PUBLISHED ? "outline" : "default"}
+                    >
+                      {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
+                      {formValues.status === PostStatus.PUBLISHED ? "Unpublish" : "Publish"}
+                    </Button>
+                  </div>
 
-              <div>
-                <FieldLabel htmlFor="status" label="Trạng thái" />
-                <Select
-                  onValueChange={(value) => {
-                    updateField("status", value as PostStatus);
-                  }}
-                  value={formValues.status}
-                >
-                  <SelectTrigger
-                    aria-invalid={Boolean(getFieldError("status"))}
-                    className="w-full"
-                    id="status"
-                    size="default"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError message={getFieldError("status")} />
-              </div>
+                  <div>
+                    <FieldLabel htmlFor="status" label="Trạng thái" />
+                    <Select
+                      onValueChange={(value) => {
+                        updateField("status", value as PostStatus);
+                      }}
+                      value={formValues.status}
+                    >
+                      <SelectTrigger
+                        aria-invalid={Boolean(getFieldError("status"))}
+                        className="w-full"
+                        id="status"
+                        size="default"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError message={getFieldError("status")} />
+                  </div>
+                </>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -1219,20 +1283,24 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
             {availableTags.length === 0 ? (
               <div className="space-y-3 rounded-xl border border-dashed border-border bg-muted/30 p-4">
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Chưa có tag nào trong hệ thống. Tạo tag trước để editor này hoàn chỉnh hơn.
+                  {isWriterVariant
+                    ? "Chưa có tag nào. Liên hệ admin để tạo tag trước."
+                    : "Chưa có tag nào trong hệ thống. Tạo tag trước để editor này hoàn chỉnh hơn."}
                 </p>
-                <Link
-                  className={cn(
-                    buttonVariants({
-                      variant: "outline",
-                      size: "sm",
-                    }),
-                    "w-fit rounded-xl border-border bg-muted/40 text-foreground hover:bg-muted/70"
-                  )}
-                  href="/admin/tags"
-                >
-                  Đi tới trang tags
-                </Link>
+                {!isWriterVariant ? (
+                  <Link
+                    className={cn(
+                      buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                      }),
+                      "w-fit rounded-xl border-border bg-muted/40 text-foreground hover:bg-muted/70"
+                    )}
+                    href="/admin/tags"
+                  >
+                    Đi tới trang tags
+                  </Link>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-4">
@@ -1247,7 +1315,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                         className={cn(
                           "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm transition",
                           isSelected
-                            ? "border-primary/30 bg-primary/15 text-primary-foreground"
+                            ? "border-primary/30 bg-primary/10 text-primary"
                             : "border-border bg-muted/40 text-muted-foreground hover:bg-muted/70"
                         )}
                         onClick={() => toggleTag(tag.id)}
@@ -1304,7 +1372,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                 </p>
                 {hasCoverImage ? (
                   <div className="mt-3 space-y-3">
-                    <div className="overflow-hidden rounded-[1.2rem] border border-border bg-[#050b13]">
+                    <div className="overflow-hidden rounded-[1.2rem] border border-border bg-muted">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         alt="Cover preview"
@@ -1313,7 +1381,7 @@ export function PostEditorForm({ availableTags, initialData, mode }: PostEditorF
                       />
                     </div>
                     <a
-                      className="inline-flex items-center gap-2 text-sm text-primary-foreground transition hover:text-primary-foreground/90"
+                      className="inline-flex items-center gap-2 text-sm text-primary transition hover:text-primary/80"
                       href={formValues.coverImageUrl}
                       rel="noreferrer"
                       target="_blank"

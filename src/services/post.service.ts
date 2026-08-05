@@ -55,6 +55,7 @@ export type PostListItem = {
   title: string;
   slug: string;
   excerpt: string | null;
+  coverImageUrl: string | null;
   status: PostStatus;
   publishedAt: Date | null;
   readingTime: number;
@@ -90,11 +91,13 @@ type UpdatePostParams = {
 type ListPostsParams = {
   search?: string;
   status?: PostStatus;
+  authorId?: string;
 };
 
 type ListPublishedPostsParams = {
   cursor?: string;
   limit?: number;
+  search?: string;
 };
 
 type ListPublishedPostsForTagParams = {
@@ -174,6 +177,7 @@ function mapPostListItem(post: Post) {
     title: post.title,
     slug: post.slug,
     excerpt: post.excerpt,
+    coverImageUrl: post.coverImageUrl,
     status: post.status,
     publishedAt: post.publishedAt,
     readingTime: post.readingTime,
@@ -425,6 +429,20 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
       return mapPostRecord(await loadPostRecordOrThrow(dataSource.manager, postId));
     },
 
+    async getPostForAuthor(postId: string, authorId: string): Promise<PostRecord> {
+      const post = await this.getPost(postId);
+
+      if (post.authorId !== authorId) {
+        throw new ServiceError({
+          code: SERVICE_ERROR_CODES.NOT_FOUND,
+          message: "Post not found.",
+          statusCode: 404,
+        });
+      }
+
+      return post;
+    },
+
     async getPublishedPostBySlug(slug: string): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
       const normalizedSlug = slug.trim();
@@ -447,6 +465,7 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
       const postRepository = dataSource.getRepository(Post);
       const normalizedSearch = params.search?.trim() ?? "";
       const normalizedStatus = params.status ?? null;
+      const authorId = params.authorId?.trim() || null;
       const where = {
         ...(normalizedSearch
           ? {
@@ -458,7 +477,13 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
             status: normalizedStatus,
           }
           : {}),
+        ...(authorId
+          ? {
+            authorId,
+          }
+          : {}),
       };
+      const authorScope = authorId ? { authorId } : {};
 
       const [posts, filteredCount, totalCount, draftCount, publishedCount] = await Promise.all([
         postRepository.find({
@@ -476,15 +501,19 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
         postRepository.count({
           where,
         }),
-        postRepository.count(),
+        postRepository.count({
+          where: authorScope,
+        }),
         postRepository.count({
           where: {
             status: PostStatus.DRAFT,
+            ...authorScope,
           },
         }),
         postRepository.count({
           where: {
             status: PostStatus.PUBLISHED,
+            ...authorScope,
           },
         }),
       ]);
@@ -511,21 +540,30 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
       const postRepository = dataSource.getRepository(Post);
       const normalizedLimit = normalizePublishedPostsPageSize(params.limit);
       const cursor = parsePublishedPostsCursor(params.cursor?.trim());
+      const normalizedSearch = params.search?.trim() ?? "";
+      const searchFilter = normalizedSearch
+        ? {
+          title: ILike(`%${normalizedSearch}%`),
+        }
+        : {};
       const where = cursor
         ? [
           {
             status: PostStatus.PUBLISHED,
             publishedAt: LessThan(cursor.publishedAt),
+            ...searchFilter,
           },
           {
             status: PostStatus.PUBLISHED,
             publishedAt: Equal(cursor.publishedAt),
             id: LessThan(cursor.id),
+            ...searchFilter,
           },
         ]
         : {
           status: PostStatus.PUBLISHED,
           publishedAt: Not(IsNull()),
+          ...searchFilter,
         };
       const cursorCandidates = await postRepository.find({
         select: {
@@ -806,6 +844,11 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
         await loadPostRecordOrThrow(manager, postId);
         await manager.getRepository(Post).delete({ id: postId });
       });
+    },
+
+    async deletePostForAuthor(postId: string, authorId: string): Promise<void> {
+      await this.getPostForAuthor(postId, authorId);
+      await this.deletePost(postId);
     },
   };
 }

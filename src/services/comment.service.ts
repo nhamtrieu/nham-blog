@@ -18,6 +18,7 @@ import type {
   CommentAdminListQuery,
   CommentCreateInput,
   CommentModerationInput,
+  CommentUpdateInput,
 } from "@/validators/comment.validator";
 
 type DataSourceFactory = typeof initializeDataSource;
@@ -267,7 +268,7 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
       slug: string;
       authorId: string;
       input: CommentCreateInput;
-    }): Promise<AdminCommentItem> {
+    }): Promise<PublicCommentItem> {
       const dataSource = await dataSourceFactory();
 
       return dataSource.transaction(async (manager) => {
@@ -280,14 +281,13 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
           postId: post.id,
           authorId: params.authorId,
           content: params.input.content,
-          status: CommentStatus.PENDING,
+          status: CommentStatus.APPROVED,
         });
         const savedComment = await commentRepository.save(comment);
         const loadedComment = await commentRepository.findOne({
           where: { id: savedComment.id },
           relations: {
             author: true,
-            post: true,
           },
         });
 
@@ -299,7 +299,7 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
           });
         }
 
-        return mapAdminComment(loadedComment);
+        return mapPublicComment(loadedComment);
       });
     },
 
@@ -415,6 +415,56 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
         message: "Comment not found.",
         statusCode: 404,
       });
+    },
+
+    async deleteOwnComment(params: { commentId: string; authorId: string }): Promise<void> {
+      const dataSource = await dataSourceFactory();
+      const commentRepository = dataSource.getRepository(Comment);
+      const result = await commentRepository.delete({
+        id: params.commentId,
+        authorId: params.authorId,
+      });
+
+      if (result.affected && result.affected > 0) {
+        return;
+      }
+
+      throw new ServiceError({
+        code: SERVICE_ERROR_CODES.NOT_FOUND,
+        message: "Comment not found.",
+        statusCode: 404,
+      });
+    },
+
+    async updateOwnComment(params: {
+      commentId: string;
+      authorId: string;
+      input: CommentUpdateInput;
+    }): Promise<PublicCommentItem> {
+      const dataSource = await dataSourceFactory();
+      const commentRepository = dataSource.getRepository(Comment);
+      const comment = await commentRepository.findOne({
+        where: {
+          id: params.commentId,
+          authorId: params.authorId,
+        },
+        relations: {
+          author: true,
+        },
+      });
+
+      if (!comment) {
+        throw new ServiceError({
+          code: SERVICE_ERROR_CODES.NOT_FOUND,
+          message: "Comment not found.",
+          statusCode: 404,
+        });
+      }
+
+      comment.content = params.input.content;
+      const savedComment = await commentRepository.save(comment);
+
+      return mapPublicComment(savedComment);
     },
   };
 }

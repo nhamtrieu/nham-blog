@@ -11,6 +11,7 @@ export type AuthenticatedUser = {
   email: string;
   name: string | null;
   role: UserRole;
+  avatarUrl: string | null;
 };
 
 export async function authenticateUserWithCredentials(
@@ -25,7 +26,7 @@ export async function authenticateUserWithCredentials(
     },
   });
 
-  if (!user) {
+  if (!user?.passwordHash) {
     return null;
   }
 
@@ -40,5 +41,6 @@ export async function authenticateUserWithCredentials(
     email: user.email,
     name: user.name,
     role: user.role,
+    avatarUrl: user.avatarUrl,
   };
 }

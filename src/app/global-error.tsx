@@ -43,7 +43,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 Thu lai
               </button>
               <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")} href="/">
-                Ve trang chu
+                Về trang chủ
               </Link>
             </CardFooter>
           </Card>

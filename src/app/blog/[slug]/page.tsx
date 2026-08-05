@@ -104,7 +104,7 @@ const headingScrollClass = "scroll-mt-24";
 function MdxH1(props: ComponentPropsWithoutRef<"h1">) {
   return (
     <h1
-      className={cn("mt-10 text-3xl font-semibold tracking-tight text-slate-900", headingScrollClass)}
+      className={cn("mt-10 text-3xl font-semibold tracking-tight text-foreground", headingScrollClass)}
       {...props}
     />
   );
@@ -113,7 +113,7 @@ function MdxH1(props: ComponentPropsWithoutRef<"h1">) {
 function MdxH2(props: ComponentPropsWithoutRef<"h2">) {
   return (
     <h2
-      className={cn("mt-9 text-2xl font-semibold tracking-tight text-slate-900", headingScrollClass)}
+      className={cn("mt-9 text-2xl font-semibold tracking-tight text-foreground", headingScrollClass)}
       {...props}
     />
   );
@@ -121,37 +121,37 @@ function MdxH2(props: ComponentPropsWithoutRef<"h2">) {
 
 function MdxH3(props: ComponentPropsWithoutRef<"h3">) {
   return (
-    <h3 className={cn("mt-8 text-xl font-semibold text-slate-900", headingScrollClass)} {...props} />
+    <h3 className={cn("mt-8 text-xl font-semibold text-foreground", headingScrollClass)} {...props} />
   );
 }
 
 function MdxH4(props: ComponentPropsWithoutRef<"h4">) {
   return (
-    <h4 className={cn("mt-7 text-lg font-semibold text-slate-900", headingScrollClass)} {...props} />
+    <h4 className={cn("mt-7 text-lg font-semibold text-foreground", headingScrollClass)} {...props} />
   );
 }
 
 function MdxH5(props: ComponentPropsWithoutRef<"h5">) {
   return (
-    <h5 className={cn("mt-6 text-base font-semibold text-slate-900", headingScrollClass)} {...props} />
+    <h5 className={cn("mt-6 text-base font-semibold text-foreground", headingScrollClass)} {...props} />
   );
 }
 
 function MdxH6(props: ComponentPropsWithoutRef<"h6">) {
   return (
-    <h6 className={cn("mt-6 text-sm font-semibold text-slate-900", headingScrollClass)} {...props} />
+    <h6 className={cn("mt-6 text-sm font-semibold text-foreground", headingScrollClass)} {...props} />
   );
 }
 
 function MdxParagraph(props: ComponentPropsWithoutRef<"p">) {
-  return <p className="mt-5 text-base leading-8 text-slate-700" {...props} />;
+  return <p className="mt-5 text-base leading-8 text-foreground/85" {...props} />;
 }
 
 function MdxAnchor({ className, ...props }: ComponentPropsWithoutRef<"a">) {
   return (
     <a
       className={cn(
-        "font-medium text-cyan-700 underline decoration-cyan-300/80 underline-offset-4 transition hover:text-cyan-800",
+        "font-medium text-primary underline decoration-primary/40 underline-offset-4 transition hover:text-primary/90",
         className
       )}
       {...props}
@@ -162,7 +162,7 @@ function MdxAnchor({ className, ...props }: ComponentPropsWithoutRef<"a">) {
 function MdxBlockquote(props: ComponentPropsWithoutRef<"blockquote">) {
   return (
     <blockquote
-      className="mt-6 border-l-4 border-cyan-300/80 bg-cyan-50/70 px-4 py-3 text-slate-700 italic"
+      className="mt-6 border-l-4 border-primary/40 bg-primary/5 px-4 py-3 text-foreground/85 italic"
       {...props}
     />
   );
@@ -171,7 +171,7 @@ function MdxBlockquote(props: ComponentPropsWithoutRef<"blockquote">) {
 function MdxPre(props: ComponentPropsWithoutRef<"pre">) {
   return (
     <pre
-      className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 text-sm leading-7 text-slate-100"
+      className="mt-6 overflow-x-auto rounded-2xl border border-border bg-muted p-4 text-sm leading-7 text-foreground"
       {...props}
     />
   );
@@ -181,7 +181,7 @@ function MdxCode({ className, ...props }: ComponentPropsWithoutRef<"code">) {
   return (
     <code
       className={cn(
-        "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.92em] text-slate-800",
+        "rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground",
         className
       )}
       {...props}
@@ -190,11 +190,11 @@ function MdxCode({ className, ...props }: ComponentPropsWithoutRef<"code">) {
 }
 
 function MdxList(props: ComponentPropsWithoutRef<"ul">) {
-  return <ul className="mt-5 list-disc space-y-2 pl-6 text-base leading-8 text-slate-700" {...props} />;
+  return <ul className="mt-5 list-disc space-y-2 pl-6 text-base leading-8 text-foreground/85" {...props} />;
 }
 
 function MdxOrderedList(props: ComponentPropsWithoutRef<"ol">) {
-  return <ol className="mt-5 list-decimal space-y-2 pl-6 text-base leading-8 text-slate-700" {...props} />;
+  return <ol className="mt-5 list-decimal space-y-2 pl-6 text-base leading-8 text-foreground/85" {...props} />;
 }
 
 function MdxImage({ alt, ...props }: ComponentPropsWithoutRef<"img">) {
@@ -202,7 +202,7 @@ function MdxImage({ alt, ...props }: ComponentPropsWithoutRef<"img">) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       alt={alt ?? ""}
-      className="mt-6 w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover shadow-[0_25px_70px_-50px_rgba(15,23,42,0.45)]"
+      className="mt-6 w-full rounded-2xl border border-border bg-muted object-cover"
       loading="lazy"
       {...props}
     />
@@ -275,27 +275,32 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <Link
-        className="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
+        className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary/40 hover:text-primary"
         href="/"
       >
-        Ve trang chu
+        Về trang chủ
       </Link>
 
       <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-start">
-        <article className="order-2 min-w-0 flex-1 rounded-[2rem] border border-slate-200 bg-white px-5 py-6 shadow-[0_30px_90px_-60px_rgba(15,23,42,0.45)] sm:px-8 sm:py-10 lg:order-1 lg:max-w-3xl">
+        <article
+          className={cn(
+            "order-2 min-w-0 flex-1 rounded-[2rem] border border-border bg-card px-5 py-6 shadow-sm sm:px-8 sm:py-10 lg:order-1",
+            tocItems.length > 0 && "lg:max-w-3xl"
+          )}
+        >
           <header>
             <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-100 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-emerald-800 uppercase">
+              <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-primary uppercase">
                 Published
               </span>
-              <span className="text-xs text-slate-500">{formatPublishedDate(post.publishedAt)}</span>
-              <span className="text-xs text-slate-500">{post.readingTime} phút đọc</span>
+              <span className="text-xs text-muted-foreground">{formatPublishedDate(post.publishedAt)}</span>
+              <span className="text-xs text-muted-foreground">{post.readingTime} phút đọc</span>
             </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
               {post.title}
             </h1>
             {post.excerpt ? (
-              <p className="mt-4 text-base leading-8 text-slate-600 sm:text-lg">{post.excerpt}</p>
+              <p className="mt-4 text-base leading-8 text-muted-foreground sm:text-lg">{post.excerpt}</p>
             ) : null}
 
             {post.tags.length > 0 ? (
@@ -303,7 +308,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 {post.tags.map((tag) => (
                   <Link
                     key={tag.id}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
+                    className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-primary"
                     href={`/tags/${tag.slug}`}
                   >
                     {tag.name}
@@ -320,13 +325,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={post.title}
-                className="aspect-video w-full rounded-[1.4rem] border border-slate-200 bg-slate-50 object-cover shadow-[0_30px_90px_-60px_rgba(15,23,42,0.55)]"
+                className="aspect-video w-full rounded-[1.4rem] border border-border bg-muted object-cover"
                 src={post.coverImageUrl}
               />
             </figure>
           ) : null}
 
-          <div className="mt-8 border-t border-slate-200 pt-6">{content}</div>
+          <div className="mt-8 border-t border-border pt-6">{content}</div>
 
           <CommentSection
             currentUser={

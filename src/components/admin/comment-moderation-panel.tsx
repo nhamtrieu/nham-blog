@@ -254,7 +254,7 @@ export function CommentModerationPanel({ initialComments }: CommentModerationPan
                           variant="outline"
                         >
                           <X className="size-3.5" />
-                          Reject
+                          Disable
                         </Button>
                         <Button
                           disabled={Boolean(busyCommentId) || comment.status === CommentStatus.SPAM}

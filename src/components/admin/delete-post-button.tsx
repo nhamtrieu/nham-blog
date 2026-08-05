@@ -21,6 +21,7 @@ type DeletePostButtonProps = {
   postId: string;
   postTitle: string;
   redirectTo?: string;
+  deleteUrl?: string;
   size?: "default" | "sm" | "lg" | "icon";
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
 };
@@ -47,6 +48,7 @@ export function DeletePostButton({
   postId,
   postTitle,
   redirectTo = "/admin/posts",
+  deleteUrl,
   size = "sm",
   variant = "outline",
 }: DeletePostButtonProps) {
@@ -62,7 +64,7 @@ export function DeletePostButton({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/admin/posts/${postId}`, {
+      const response = await fetch(deleteUrl ?? `/api/admin/posts/${postId}`, {
         method: "DELETE",
       });
 
@@ -88,7 +90,7 @@ export function DeletePostButton({
       <AlertDialogTrigger
         render={
           <Button
-            className="text-rose-200 hover:text-rose-100"
+            className="text-destructive hover:text-destructive/90"
             size={size}
             variant={variant}
           />

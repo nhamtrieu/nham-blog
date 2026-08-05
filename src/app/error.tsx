@@ -26,7 +26,7 @@ export default function AppError({ error, reset }: AppErrorProps) {
             Thu lai
           </Button>
           <Link className={actionLinkClass} href="/">
-            Ve trang chu
+            Về trang chủ
           </Link>
         </>
       }

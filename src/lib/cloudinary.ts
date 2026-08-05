@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { env } from "@/env";
 
 export const CLOUDINARY_UPLOAD_FOLDER = "nham-blog/admin";
+export const CLOUDINARY_AVATAR_FOLDER = "nham-blog/avatars";
 export const CLOUDINARY_UPLOAD_RESOURCE_TYPE = "image";
 
 type CloudinaryConfig = {
@@ -42,7 +43,10 @@ export function isCloudinaryConfigured() {
 }
 
 export function createSignedUploadPayload(
-  timestamp = Math.floor(Date.now() / 1000)
+  options: {
+    folder?: string;
+    timestamp?: number;
+  } = {}
 ): SignedUploadPayload {
   const config = getCloudinaryConfig();
 
@@ -50,9 +54,11 @@ export function createSignedUploadPayload(
     throw new Error("Cloudinary is not configured.");
   }
 
+  const folder = options.folder ?? CLOUDINARY_UPLOAD_FOLDER;
+  const timestamp = options.timestamp ?? Math.floor(Date.now() / 1000);
   const signature = cloudinary.utils.api_sign_request(
     {
-      folder: CLOUDINARY_UPLOAD_FOLDER,
+      folder,
       timestamp: String(timestamp),
     },
     config.apiSecret
@@ -61,7 +67,7 @@ export function createSignedUploadPayload(
   return {
     apiKey: config.apiKey,
     cloudName: config.cloudName,
-    folder: CLOUDINARY_UPLOAD_FOLDER,
+    folder,
     resourceType: CLOUDINARY_UPLOAD_RESOURCE_TYPE,
     signature,
     timestamp,

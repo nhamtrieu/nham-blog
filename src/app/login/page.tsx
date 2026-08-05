@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   return (
-    <main className="flex min-h-dvh bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
+    <main className="flex min-h-dvh bg-background px-4 py-10 text-foreground sm:px-6">
       <div className="mx-auto flex w-full max-w-md items-center">
         <ReaderAuthForm />
       </div>

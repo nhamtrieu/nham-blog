@@ -32,6 +32,8 @@ const envSchema = z.object({
     .trim()
     .regex(/^G-[A-Z0-9]+$/, "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID must match GA4 format (e.g. G-XXXXXXX).")
     .optional(),
+  GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().trim().min(1).optional(),
 });
 
 function formatEnvErrors(error: z.ZodError) {
@@ -72,6 +74,8 @@ function parseEnv() {
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
   });
 
   if (!parsed.success) {

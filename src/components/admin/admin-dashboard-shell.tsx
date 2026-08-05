@@ -64,8 +64,8 @@ export function AdminDashboardShell({ children, userName, userEmail }: AdminDash
           <SidebarRail />
         </Sidebar>
 
-        <SidebarInset className="min-h-0 bg-background mt-0 relative">
-          <div className="flex min-h-0 flex-1 flex-col">
+        <SidebarInset className="relative mt-0 min-h-0 min-w-0 overflow-hidden bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-20 flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b border-border bg-card/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-card/80 md:px-6">
               <SidebarTrigger className="-ml-1" />
               <Separator className="hidden h-6 md:block" orientation="vertical" />
@@ -102,7 +102,9 @@ export function AdminDashboardShell({ children, userName, userEmail }: AdminDash
               </div>
             </header>
 
-            <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 md:p-6">{children}</div>
+            <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+              {children}
+            </div>
           </div>
         </SidebarInset>
       </SidebarProvider>

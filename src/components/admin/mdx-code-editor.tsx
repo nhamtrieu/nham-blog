@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
@@ -33,6 +33,8 @@ type MdxCodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** admin shell uses nested `.dark` (not always on <html>) */
+  appearance?: "auto" | "light" | "dark";
 };
 
 type SelectionMutator = (params: {
@@ -46,9 +48,43 @@ type SelectionMutator = (params: {
   selectionTo: number;
 };
 
-export function MdxCodeEditor({ id, value, onChange, className }: MdxCodeEditorProps) {
+export function MdxCodeEditor({
+  id,
+  value,
+  onChange,
+  className,
+  appearance = "auto",
+}: MdxCodeEditorProps) {
   const editorViewRef = useRef<EditorView | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isDark, setIsDark] = useState(appearance !== "light");
   const extensions = useMemo(() => [markdown()], []);
+
+  useEffect(() => {
+    if (appearance === "dark") {
+      setIsDark(true);
+      return;
+    }
+
+    if (appearance === "light") {
+      setIsDark(false);
+      return;
+    }
+
+    const sync = () => {
+      const htmlDark = document.documentElement.classList.contains("dark");
+      const nestedDark = Boolean(containerRef.current?.closest(".dark"));
+      setIsDark(htmlDark || nestedDark);
+    };
+
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [appearance]);
 
   function updateDoc(
     view: EditorView,
@@ -154,7 +190,7 @@ export function MdxCodeEditor({ id, value, onChange, className }: MdxCodeEditorP
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("min-w-0 space-y-3", className)} ref={containerRef}>
       <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/30 p-2">
         <Button onClick={() => wrapSelection("# ", "", "Heading 1")} size="sm" type="button" variant="outline">
           <Heading1 className="size-3.5" />
@@ -251,7 +287,7 @@ export function MdxCodeEditor({ id, value, onChange, className }: MdxCodeEditorP
           autocompletion: true,
           closeBrackets: true,
         }}
-        className="overflow-hidden rounded-xl border border-input"
+        className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-input [&_.cm-editor]:!min-w-0 [&_.cm-editor]:max-w-full [&_.cm-scroller]:min-w-0 [&_.cm-scroller]:overflow-auto [&_.cm-content]:min-w-0"
         extensions={extensions}
         height="24rem"
         id={id}
@@ -259,7 +295,7 @@ export function MdxCodeEditor({ id, value, onChange, className }: MdxCodeEditorP
         onCreateEditor={(view) => {
           editorViewRef.current = view;
         }}
-        theme={oneDark}
+        theme={isDark ? oneDark : "light"}
         value={value}
       />
     </div>

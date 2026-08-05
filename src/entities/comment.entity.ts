@@ -46,7 +46,7 @@ export class Comment {
   @Column({
     type: "enum",
     enum: CommentStatus,
-    default: CommentStatus.PENDING,
+    default: CommentStatus.APPROVED,
   })
   status!: CommentStatus;
 

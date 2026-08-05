@@ -18,7 +18,18 @@ import type { Post as PostEntity } from "@/entities/post.entity";
 export enum UserRole {
   ADMIN = "ADMIN",
   READER = "READER",
+  WRITER = "WRITER",
 }
+
+export type UserSocialLinks = {
+  twitter?: string;
+  facebook?: string;
+  tiktok?: string;
+  personal?: string;
+  github?: string;
+  youtube?: string;
+  linkedin?: string;
+};
 
 @Entity({ name: "users" })
 export class User {
@@ -36,8 +47,9 @@ export class User {
     name: "password_hash",
     type: "varchar",
     length: 255,
+    nullable: true,
   })
-  passwordHash!: string;
+  passwordHash!: string | null;
 
   @Column({
     type: "enum",
@@ -52,6 +64,51 @@ export class User {
     nullable: true,
   })
   name!: string | null;
+
+  @Column({
+    name: "first_name",
+    type: "varchar",
+    length: 80,
+    nullable: true,
+  })
+  firstName!: string | null;
+
+  @Column({
+    name: "last_name",
+    type: "varchar",
+    length: 80,
+    nullable: true,
+  })
+  lastName!: string | null;
+
+  @Column({
+    name: "job_title",
+    type: "varchar",
+    length: 120,
+    nullable: true,
+  })
+  jobTitle!: string | null;
+
+  @Column({
+    type: "text",
+    nullable: true,
+  })
+  bio!: string | null;
+
+  @Column({
+    name: "social_links",
+    type: "jsonb",
+    default: () => "'{}'",
+  })
+  socialLinks!: UserSocialLinks;
+
+  @Column({
+    name: "avatar_url",
+    type: "varchar",
+    length: 500,
+    nullable: true,
+  })
+  avatarUrl!: string | null;
 
   @OneToMany(() => Post, (post) => post.author)
   posts!: Relation<PostEntity[]>;

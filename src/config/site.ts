@@ -1,9 +1,9 @@
 export const siteConfig = {
   name: "Nham Blog",
   title: "Nham Blog",
-  heading: "Blog foundation and shadcn/ui setup are ready for implementation.",
+  heading: "Viết về engineering một cách rõ ràng.",
   description:
-    "Scaffolded with Next.js App Router, wired for Yarn workflows, validated with Zod, and prepared for TypeORM, auth, and a shadcn/ui-based admin experience.",
+    "Nhật ký kỹ thuật, pattern thực dụng và những ghi chú mình muốn giữ lại khi làm sản phẩm.",
   locale: "vi",
 } as const;
 

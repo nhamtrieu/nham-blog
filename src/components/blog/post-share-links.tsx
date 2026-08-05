@@ -31,7 +31,7 @@ export function PostShareLinks({ url, title, className }: PostShareLinksProps) {
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <span className="text-xs font-medium text-muted-foreground">Chia se:</span>
+      <span className="text-xs font-medium text-muted-foreground">Chia sẻ:</span>
       <a className={chip} href={shareHref("twitter", url, title)} rel="noopener noreferrer" target="_blank">
         X / Twitter
       </a>

@@ -14,8 +14,22 @@ type AdminSession = AuthenticatedSession & {
   };
 };
 
+type WriterSession = AuthenticatedSession & {
+  user: AuthenticatedSession["user"] & {
+    role: UserRole.WRITER;
+  };
+};
+
 export function isAdminSession(session: Session | null | undefined): session is AdminSession {
   return session?.user?.role === UserRole.ADMIN;
+}
+
+export function isWriterSession(session: Session | null | undefined): session is WriterSession {
+  return session?.user?.role === UserRole.WRITER;
+}
+
+export function canWritePosts(session: Session | null | undefined): boolean {
+  return isAdminSession(session) || isWriterSession(session);
 }
 
 export function isAuthenticatedSession(

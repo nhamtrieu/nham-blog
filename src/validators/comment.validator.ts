@@ -38,10 +38,15 @@ export const commentAdminListQuerySchema = z.object({
 });
 
 export type CommentCreateInput = z.infer<typeof commentCreateSchema>;
+export type CommentUpdateInput = CommentCreateInput;
 export type CommentModerationInput = z.infer<typeof commentModerationSchema>;
 export type CommentAdminListQuery = z.infer<typeof commentAdminListQuerySchema>;
 
 export function validateCommentCreateInput(input: unknown): ValidationResult<CommentCreateInput> {
+  return validateWithSchema(commentCreateSchema, input, COMMENT_VALIDATION_MESSAGE);
+}
+
+export function validateCommentUpdateInput(input: unknown): ValidationResult<CommentUpdateInput> {
   return validateWithSchema(commentCreateSchema, input, COMMENT_VALIDATION_MESSAGE);
 }
 

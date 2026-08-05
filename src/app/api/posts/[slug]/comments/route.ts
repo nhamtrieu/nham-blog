@@ -102,7 +102,7 @@ export async function POST(request: Request, { params }: CommentsRouteContext) {
     return NextResponse.json(
       {
         comment,
-        message: "Comment is waiting for moderation.",
+        message: "Comment published.",
       },
       { status: 201 }
     );
