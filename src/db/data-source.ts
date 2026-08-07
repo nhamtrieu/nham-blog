@@ -13,7 +13,6 @@ type TypeOrmGlobalState = {
   dataSourcePromise?: Promise<DataSource>;
   dataSourceDestroyPromise?: Promise<void>;
   entityTargets?: EntityTargetSnapshot;
-  entityNamesPinned?: boolean;
 };
 
 const globalForTypeOrm = globalThis as typeof globalThis & {
@@ -32,21 +31,20 @@ function getGlobalState(): TypeOrmGlobalState {
  * Next.js production minify mangles class names (Comment -> "h").
  * TypeORM keys entity metadata by constructor.name, so mangled duplicates
  * look like self-cycles ("h -> h"). Pin each class name to @Entity({ name }).
+ *
+ * Re-runs on every call so HMR-reloaded class constructors get pinned too.
  */
 function pinEntityClassNames() {
-  const state = getGlobalState();
-
-  if (state.entityNamesPinned) {
-    return;
-  }
-
   for (const table of getMetadataArgsStorage().tables) {
-    if (typeof table.target === "function" && table.name) {
-      Object.defineProperty(table.target, "name", { value: table.name });
+    if (typeof table.target !== "function" || !table.name) {
+      continue;
     }
-  }
 
-  state.entityNamesPinned = true;
+    Object.defineProperty(table.target, "name", {
+      value: table.name,
+      configurable: true,
+    });
+  }
 }
 
 function requireDatabaseUrl() {
@@ -67,11 +65,31 @@ function hasEntityTargetsChanged(
     return true;
   }
 
+  // HMR reloads entity modules with new class identities; TypeORM metadata is keyed
+  // by those identities, so a rebuild is required even when table names are unchanged.
   return previousTargets.some((target, index) => target !== nextTargets[index]);
 }
 
 function isPoolAlreadyEndedError(error: unknown) {
   return error instanceof Error && error.message.includes("Called end on pool more than once");
+}
+
+function isConnectionTerminatedError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message;
+  return (
+    message.includes("Connection terminated") ||
+    message.includes("Connection terminated unexpectedly") ||
+    message.includes("Client has encountered a connection error") ||
+    message.includes("cannot acquire a connection")
+  );
+}
+
+function isStaleEntityMetadataError(error: unknown) {
+  return error instanceof Error && error.message.includes("No metadata for");
 }
 
 async function destroyDataSourceSafely(state: TypeOrmGlobalState) {
@@ -94,6 +112,31 @@ async function destroyDataSourceSafely(state: TypeOrmGlobalState) {
   }
 }
 
+/**
+ * HMR swaps entity class identity mid-request. Destroying the pool immediately
+ * kills in-flight queries ("Connection terminated"). Detach first, let callers
+ * finish on the old pool, then destroy after a short grace period.
+ */
+function detachDataSourceForRebuild(state: TypeOrmGlobalState) {
+  const previous = state.dataSource;
+  state.dataSource = undefined;
+  state.dataSourcePromise = undefined;
+  state.entityTargets = undefined;
+
+  if (!previous?.isInitialized) {
+    return;
+  }
+
+  // ponytail: single-process HMR only; ceiling = orphaned pools if destroy fails silently
+  setTimeout(() => {
+    void previous.destroy().catch((error) => {
+      if (!isPoolAlreadyEndedError(error)) {
+        console.error("[typeorm] deferred destroy failed", error);
+      }
+    });
+  }, 5_000);
+}
+
 export function createDataSourceOptions(
   overrides: Partial<PostgresDataSourceOptions> = {}
 ): PostgresDataSourceOptions {
@@ -108,10 +151,13 @@ export function createDataSourceOptions(
     entities: appEntities,
     migrations: [],
     subscribers: [],
+    // Remote Postgres (e.g. over Tailscale): keepAlive so idle NAT drops are rarer.
     extra: {
       max: env.NODE_ENV === "development" ? 5 : 10,
       connectionTimeoutMillis: 10_000,
-      idleTimeoutMillis: 20_000,
+      idleTimeoutMillis: 30_000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
     },
     ...overrides,
   };
@@ -136,10 +182,7 @@ export async function initializeDataSource() {
   const state = getGlobalState();
 
   if (state.dataSource && hasEntityTargetsChanged(state.entityTargets, appEntities)) {
-    await destroyDataSourceSafely(state);
-    state.dataSource = undefined;
-    state.dataSourcePromise = undefined;
-    state.entityTargets = undefined;
+    detachDataSourceForRebuild(state);
   }
 
   const dataSource = getDataSource();
@@ -164,6 +207,28 @@ export async function initializeDataSource() {
   return state.dataSourcePromise;
 }
 
+/** Drop the pool and re-init. Used after remote DB / Tailscale drops a live connection. */
+export async function reinitializeDataSource() {
+  await destroyDataSource();
+  return initializeDataSource();
+}
+
+/**
+ * Run a DB operation; on dead connection or HMR-stale entity metadata, rebuild once and retry.
+ */
+export async function withDataSource<T>(fn: (dataSource: DataSource) => Promise<T>): Promise<T> {
+  try {
+    return await fn(await initializeDataSource());
+  } catch (error) {
+    if (!isConnectionTerminatedError(error) && !isStaleEntityMetadataError(error)) {
+      throw error;
+    }
+
+    await reinitializeDataSource();
+    return fn(await initializeDataSource());
+  }
+}
+
 export async function destroyDataSource() {
   const state = getGlobalState();
 
@@ -176,3 +241,5 @@ export async function destroyDataSource() {
   state.dataSourcePromise = undefined;
   state.entityTargets = undefined;
 }
+
+export { isConnectionTerminatedError };

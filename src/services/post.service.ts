@@ -7,10 +7,11 @@ import {
   LessThan,
   Like,
   Not,
+  type DataSource,
   type EntityManager,
 } from "typeorm";
 
-import { initializeDataSource } from "@/db/data-source";
+import { initializeDataSource, withDataSource } from "@/db/data-source";
 import { Post, PostStatus } from "@/entities/post.entity";
 import { PostTag } from "@/entities/post-tag.entity";
 import { Tag } from "@/entities/tag.entity";
@@ -25,10 +26,27 @@ import type { PostCreateInput, PostUpdateInput } from "@/validators/post.validat
 
 type DataSourceFactory = typeof initializeDataSource;
 
+async function runWithDataSource<T>(
+  factory: DataSourceFactory,
+  fn: (dataSource: DataSource) => Promise<T>
+): Promise<T> {
+  if (factory === initializeDataSource) {
+    return withDataSource(fn);
+  }
+
+  return fn(await factory());
+}
+
 type PostTagSummary = {
   id: string;
   name: string;
   slug: string;
+};
+
+export type PostAuthorSummary = {
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
 };
 
 export type PostRecord = {
@@ -44,6 +62,7 @@ export type PostRecord = {
   seoTitle: string | null;
   seoDescription: string | null;
   authorId: string;
+  author: PostAuthorSummary | null;
   createdAt: Date;
   updatedAt: Date;
   tagIds: string[];
@@ -98,12 +117,14 @@ type ListPublishedPostsParams = {
   cursor?: string;
   limit?: number;
   search?: string;
+  authorId?: string;
 };
 
 type ListPublishedPostsForTagParams = {
   tagId: string;
   cursor?: string;
   limit?: number;
+  authorId?: string;
 };
 
 export type PublishedPostListResult = {
@@ -140,6 +161,18 @@ function mapTagSummary(tag: Tag): PostTagSummary {
   };
 }
 
+function mapAuthorSummary(author: User | null | undefined): PostAuthorSummary | null {
+  if (!author) {
+    return null;
+  }
+
+  return {
+    id: author.id,
+    name: author.name,
+    avatarUrl: author.avatarUrl,
+  };
+}
+
 function sortTagsByOrder(tags: Tag[]) {
   return [...tags].sort((leftTag, rightTag) => {
     if (leftTag.orderNumber !== rightTag.orderNumber) {
@@ -170,6 +203,7 @@ function mapPostRecord(post: Post) {
     seoTitle: post.seoTitle,
     seoDescription: post.seoDescription,
     authorId: post.authorId,
+    author: mapAuthorSummary(post.author),
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
     tagIds: tags.map((tag) => tag.id),
@@ -301,6 +335,7 @@ async function loadPostRecordOrThrow(manager: EntityManager, postId: string) {
   const post = await postRepository.findOne({
     where: { id: postId },
     relations: {
+      author: true,
       postTags: {
         tag: true,
       },
@@ -327,6 +362,7 @@ async function loadPublishedPostRecordBySlugOrThrow(manager: EntityManager, slug
       publishedAt: Not(IsNull()),
     },
     relations: {
+      author: true,
       postTags: {
         tag: true,
       },
@@ -456,7 +492,6 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
     },
 
     async getPublishedPostBySlug(slug: string): Promise<PostRecord> {
-      const dataSource = await dataSourceFactory();
       const normalizedSlug = slug.trim();
 
       if (normalizedSlug.length === 0) {
@@ -467,8 +502,10 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
         });
       }
 
-      return mapPostRecord(
-        await loadPublishedPostRecordBySlugOrThrow(dataSource.manager, normalizedSlug)
+      return runWithDataSource(dataSourceFactory, async (dataSource) =>
+        mapPostRecord(
+          await loadPublishedPostRecordBySlugOrThrow(dataSource.manager, normalizedSlug)
+        )
       );
     },
 
@@ -553,6 +590,8 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
       const normalizedLimit = normalizePublishedPostsPageSize(params.limit);
       const cursor = parsePublishedPostsCursor(params.cursor?.trim());
       const normalizedSearch = params.search?.trim() ?? "";
+      const authorId = params.authorId?.trim() || null;
+      const authorFilter = authorId ? { authorId } : {};
       const searchFilter = normalizedSearch
         ? {
           title: ILike(`%${normalizedSearch}%`),
@@ -564,18 +603,21 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
             status: PostStatus.PUBLISHED,
             publishedAt: LessThan(cursor.publishedAt),
             ...searchFilter,
+            ...authorFilter,
           },
           {
             status: PostStatus.PUBLISHED,
             publishedAt: Equal(cursor.publishedAt),
             id: LessThan(cursor.id),
             ...searchFilter,
+            ...authorFilter,
           },
         ]
         : {
           status: PostStatus.PUBLISHED,
           publishedAt: Not(IsNull()),
           ...searchFilter,
+          ...authorFilter,
         };
       const cursorCandidates = await postRepository.find({
         select: {
@@ -646,6 +688,10 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
         .where("postTag.tagId = :tagId", { tagId: params.tagId })
         .andWhere("post.status = :status", { status: PostStatus.PUBLISHED })
         .andWhere("post.publishedAt IS NOT NULL");
+
+      if (params.authorId?.trim()) {
+        query.andWhere("post.authorId = :authorId", { authorId: params.authorId.trim() });
+      }
 
       if (cursor) {
         query.andWhere(

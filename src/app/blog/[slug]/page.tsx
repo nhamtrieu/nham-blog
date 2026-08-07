@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { compileMDX } from "next-mdx-remote/rsc";
+import { ChevronRight, Home, UserRound } from "lucide-react";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
@@ -9,14 +10,20 @@ import type { ComponentPropsWithoutRef } from "react";
 
 import { getServerAuthSession } from "@/auth";
 import { CommentSection, type PublicCommentView } from "@/components/blog/comment-section";
-import { PostShareLinks } from "@/components/blog/post-share-links";
+import { PostEngagementBar } from "@/components/blog/post-engagement-bar";
 import { PostTableOfContents } from "@/components/blog/post-table-of-contents";
 import { loadPublishedPostBySlug } from "@/app/blog/[slug]/load-published-post";
 import { env } from "@/env";
 import { absoluteUrl } from "@/lib/absolute-url";
+import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { extractMdxHeadings } from "@/lib/mdx-headings";
 import { cn } from "@/lib/utils";
-import { SERVICE_ERROR_CODES, commentService, isServiceError } from "@/services";
+import {
+  SERVICE_ERROR_CODES,
+  commentService,
+  isServiceError,
+  postEngagementService,
+} from "@/services";
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -26,6 +33,16 @@ type BlogPostPageProps = {
 
 function trimMetaDescription(value: string, max = 200) {
   return value.replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function truncateBreadcrumbTitle(title: string, max = 42) {
+  const normalized = title.replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= max) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, max).trimEnd()}...`;
 }
 
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
@@ -87,16 +104,27 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
 function formatPublishedDate(value: Date | null) {
   if (!value) {
-    return "Chua co ngay publish";
+    return "Chưa có ngày publish";
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(value);
+  }).formatToParts(value);
+  const day = parts.find((part) => part.type === "day")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const year = parts.find((part) => part.type === "year")?.value;
+
+  if (!day || !month || !year) {
+    return new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(value);
+  }
+
+  return `${day} ${month}, ${year}`;
 }
 
 const headingScrollClass = "scroll-mt-24";
@@ -265,6 +293,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     commentService.listApprovedCommentsForPostSlug({ slug: post.slug }),
     getServerAuthSession(),
   ]);
+  const authenticated = isAuthenticatedSession(session);
+  const engagement = await postEngagementService.getEngagementForPostSlug({
+    slug: post.slug,
+    userId: authenticated ? session.user.id : null,
+  });
   const commentViews: PublicCommentView[] = initialComments.items.map((comment) => ({
     id: comment.id,
     parentId: comment.parentId,
@@ -272,45 +305,74 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     createdAt: comment.createdAt.toISOString(),
     author: comment.author,
   }));
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(`/blog/${post.slug}`)}`;
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <Link
-        className="inline-flex items-center rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary/40 hover:text-primary"
-        href="/"
-      >
-        Về trang chủ
-      </Link>
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <ol className="flex min-w-0 items-center gap-1.5">
+          <li className="shrink-0">
+            <Link
+              aria-label="Về trang chủ"
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              href="/"
+            >
+              <Home className="size-4" strokeWidth={1.75} />
+            </Link>
+          </li>
+          <li aria-hidden className="flex shrink-0 items-center">
+            <ChevronRight className="size-3.5 opacity-70" strokeWidth={2} />
+          </li>
+          <li className="shrink-0">
+            <Link
+              className="rounded-md px-1.5 py-1 transition hover:bg-muted hover:text-foreground"
+              href="/blog"
+            >
+              Post
+            </Link>
+          </li>
+          <li aria-hidden className="flex shrink-0 items-center">
+            <ChevronRight className="size-3.5 opacity-70" strokeWidth={2} />
+          </li>
+          <li className="min-w-0">
+            <span aria-current="page" className="block truncate px-1.5 py-1 text-foreground/80">
+              {truncateBreadcrumbTitle(post.title)}
+            </span>
+          </li>
+        </ol>
+      </nav>
 
       <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:items-start">
+        <div className="order-2 hidden shrink-0 lg:order-1 lg:sticky lg:top-24 lg:block lg:self-start">
+          <PostEngagementBar
+            initialEngagement={engagement}
+            isAuthenticated={authenticated}
+            loginHref={loginHref}
+            slug={post.slug}
+            title={post.title}
+            url={postUrl}
+          />
+        </div>
+
         <article
           className={cn(
-            "order-2 min-w-0 flex-1 rounded-[2rem] border border-border bg-card px-5 py-6 shadow-sm sm:px-8 sm:py-10 lg:order-1",
+            "order-3 min-w-0 flex-1 px-1 py-2 sm:px-2 lg:order-2",
             tocItems.length > 0 && "lg:max-w-3xl"
           )}
         >
           <header>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-primary uppercase">
-                Published
-              </span>
-              <span className="text-xs text-muted-foreground">{formatPublishedDate(post.publishedAt)}</span>
-              <span className="text-xs text-muted-foreground">{post.readingTime} phút đọc</span>
-            </div>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl sm:leading-tight">
               {post.title}
             </h1>
-            {post.excerpt ? (
-              <p className="mt-4 text-base leading-8 text-muted-foreground sm:text-lg">{post.excerpt}</p>
-            ) : null}
+            <p className="mt-3 text-sm text-muted-foreground">{formatPublishedDate(post.publishedAt)}</p>
 
             {post.tags.length > 0 ? (
-              <div className="mt-5 flex flex-wrap items-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 {post.tags.map((tag) => (
                   <Link
                     key={tag.id}
-                    className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-primary"
-                    href={`/tags/${tag.slug}`}
+                    className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-sm text-foreground/80 transition hover:bg-primary/10 hover:text-primary"
+                    href={`/blog?tag=${encodeURIComponent(tag.slug)}`}
                   >
                     {tag.name}
                   </Link>
@@ -318,7 +380,43 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
             ) : null}
 
-            <PostShareLinks className="mt-6" title={post.title} url={postUrl} />
+            {post.author ? (
+              <Link
+                className="mt-6 flex w-fit items-center gap-3 rounded-lg transition hover:opacity-90"
+                href={`/authors/${post.author.id}`}
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground">
+                  {post.author.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt=""
+                      className="size-full object-cover"
+                      src={post.author.avatarUrl}
+                    />
+                  ) : (
+                    <UserRound className="size-5" strokeWidth={1.75} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {post.author.name ?? "Tác giả"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Author</p>
+                </div>
+              </Link>
+            ) : null}
+
+            <div className="mt-6 lg:hidden">
+              <PostEngagementBar
+                initialEngagement={engagement}
+                isAuthenticated={authenticated}
+                loginHref={loginHref}
+                orientation="horizontal"
+                slug={post.slug}
+                title={post.title}
+                url={postUrl}
+              />
+            </div>
           </header>
 
           {post.coverImageUrl ? (
@@ -344,13 +442,13 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 : null
             }
             initialComments={commentViews}
-            loginHref={`/login?callbackUrl=${encodeURIComponent(`/blog/${post.slug}`)}`}
+            loginHref={loginHref}
             slug={post.slug}
           />
         </article>
 
         {tocItems.length > 0 ? (
-          <aside className="order-1 w-full shrink-0 lg:order-2 lg:sticky lg:top-24 lg:w-72 lg:self-start">
+          <aside className="order-1 w-full shrink-0 lg:order-3 lg:sticky lg:top-24 lg:w-72 lg:self-start">
             <PostTableOfContents
               className="lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"
               items={tocItems}

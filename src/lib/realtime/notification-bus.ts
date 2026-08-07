@@ -12,7 +12,7 @@ export type NotificationRealtimePayload = {
   actorName: string | null;
   postId: string;
   postSlug: string;
-  commentId: string;
+  commentId: string | null;
   parentCommentId: string | null;
   createdAt: string;
 };

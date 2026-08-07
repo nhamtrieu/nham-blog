@@ -9,15 +9,21 @@ import type { TagListItem } from "@/services/tag.service";
 type BlogCategoryFilterProps = {
   tags: TagListItem[];
   activeTagSlug: string | null;
+  /** First page path without query, e.g. `/blog` or `/authors/:id`. */
+  basePath?: string;
 };
 
-export function BlogCategoryFilter({ tags, activeTagSlug }: BlogCategoryFilterProps) {
+export function BlogCategoryFilter({
+  tags,
+  activeTagSlug,
+  basePath = "/blog",
+}: BlogCategoryFilterProps) {
   const filters = [
-    { slug: null as string | null, label: "All", href: "/blog" },
+    { slug: null as string | null, label: "All", href: basePath },
     ...tags.map((tag) => ({
       slug: tag.slug,
       label: tag.name,
-      href: `/blog?tag=${encodeURIComponent(tag.slug)}`,
+      href: `${basePath}?tag=${encodeURIComponent(tag.slug)}`,
     })),
   ];
 
@@ -56,7 +62,7 @@ export function BlogPostCard({ post }: BlogPostCardProps) {
   return (
     <article className="group flex h-full flex-col">
       <Link className="block" href={`/blog/${post.slug}`}>
-        <div className="aspect-[16/10] overflow-hidden rounded-2xl border border-border/50 bg-muted">
+        <div className="aspect-16/10 overflow-hidden rounded-2xl border border-border/50 bg-muted">
           <PostCover coverImageUrl={post.coverImageUrl} title={post.title} />
         </div>
         <h2 className="mt-3 line-clamp-2 text-base font-bold leading-snug text-foreground transition group-hover:text-primary sm:text-[1.05rem]">
@@ -146,7 +152,7 @@ export function BlogPostGrid({
 
   return (
     <div className="space-y-10">
-      <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
         {posts.map((post) => (
           <BlogPostCard key={post.id} post={post} />
         ))}

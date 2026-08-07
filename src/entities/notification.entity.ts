@@ -18,6 +18,7 @@ import type { User as UserEntity } from "@/entities/user.entity";
 export enum NotificationType {
   COMMENT_REPLY = "COMMENT_REPLY",
   POST_COMMENT = "POST_COMMENT",
+  POST_LIKE = "POST_LIKE",
 }
 
 @Entity({ name: "notifications" })
@@ -52,8 +53,9 @@ export class Notification {
   @Column({
     name: "comment_id",
     type: "uuid",
+    nullable: true,
   })
-  commentId!: string;
+  commentId!: string | null;
 
   @Column({
     name: "parent_comment_id",
@@ -91,11 +93,11 @@ export class Notification {
   post!: Relation<PostEntity>;
 
   @ManyToOne(() => Comment, {
-    nullable: false,
+    nullable: true,
     onDelete: "CASCADE",
   })
   @JoinColumn({ name: "comment_id" })
-  comment!: Relation<CommentEntity>;
+  comment!: Relation<CommentEntity | null>;
 
   @ManyToOne(() => Comment, {
     nullable: true,

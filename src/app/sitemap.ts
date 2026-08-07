@@ -24,7 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.85,
     })),
     ...tags.map((tag) => ({
-      url: absoluteUrl(`/tags/${tag.slug}`),
+      url: absoluteUrl(`/blog?tag=${encodeURIComponent(tag.slug)}`),
       lastModified: tag.updatedAt,
       changeFrequency: "weekly" as const,
       priority: 0.55,

@@ -27,7 +27,7 @@ export type NotificationListItem = {
     slug: string;
     title: string;
   };
-  commentId: string;
+  commentId: string | null;
   parentCommentId: string | null;
 };
 
@@ -122,7 +122,7 @@ async function createAndPublishNotification(
     actorId: string;
     type: NotificationType;
     postId: string;
-    commentId: string;
+    commentId: string | null;
     parentCommentId: string | null;
   }
 ): Promise<NotificationListItem | null> {
@@ -187,6 +187,35 @@ export function createNotificationService(
         type: NotificationType.POST_COMMENT,
         parentCommentId: null,
       });
+    },
+
+    async createPostLikeNotification(params: {
+      userId: string;
+      actorId: string;
+      postId: string;
+    }): Promise<NotificationListItem | null> {
+      return createAndPublishNotification(dataSourceFactory, {
+        ...params,
+        type: NotificationType.POST_LIKE,
+        commentId: null,
+        parentCommentId: null,
+      });
+    },
+
+    async deletePostLikeNotification(params: {
+      userId: string;
+      actorId: string;
+      postId: string;
+    }): Promise<number> {
+      const dataSource = await dataSourceFactory();
+      const result = await dataSource.getRepository(Notification).delete({
+        userId: params.userId,
+        actorId: params.actorId,
+        postId: params.postId,
+        type: NotificationType.POST_LIKE,
+      });
+
+      return result.affected ?? 0;
     },
 
     async listForUser(params: {

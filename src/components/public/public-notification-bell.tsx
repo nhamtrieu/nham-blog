@@ -22,7 +22,7 @@ type NotificationItem = {
     slug: string;
     title: string;
   };
-  commentId: string;
+  commentId: string | null;
   parentCommentId: string | null;
 };
 
@@ -39,7 +39,7 @@ type SseNotificationPayload = {
   type: string;
   actorName: string | null;
   postSlug: string;
-  commentId: string;
+  commentId: string | null;
   parentCommentId: string | null;
   createdAt: string;
 };
@@ -73,6 +73,15 @@ function notificationMessage(item: Pick<NotificationItem, "type" | "actor" | "po
   const actorName = item.actor.name ?? "Ai đó";
   const postSuffix = item.post.title ? ` trên “${item.post.title}”` : "";
 
+  if (item.type === "POST_LIKE") {
+    return (
+      <>
+        <span className="font-medium">{actorName}</span> đã thích bài viết của bạn
+        {postSuffix}.
+      </>
+    );
+  }
+
   if (item.type === "POST_COMMENT") {
     return (
       <>
@@ -88,6 +97,14 @@ function notificationMessage(item: Pick<NotificationItem, "type" | "actor" | "po
       {postSuffix}.
     </>
   );
+}
+
+function notificationHref(item: Pick<NotificationItem, "type" | "post" | "commentId">) {
+  if (item.type === "POST_LIKE" || !item.commentId) {
+    return `/blog/${item.post.slug}`;
+  }
+
+  return `/blog/${item.post.slug}#comment-${item.commentId}`;
 }
 
 export function PublicNotificationBell() {
@@ -301,9 +318,13 @@ export function PublicNotificationBell() {
                     buttonVariants({ variant: "ghost", size: "sm" }),
                     "h-auto w-full items-start justify-start gap-2 whitespace-normal px-2 py-2 text-left"
                   )}
-                  href={`/blog/${item.post.slug}#comment-${item.commentId}`}
+                  href={notificationHref(item)}
                   onClick={(event) => {
                     void markOneRead(item);
+
+                    if (!item.commentId || item.type === "POST_LIKE") {
+                      return;
+                    }
 
                     // Same post page: Next soft-nav won't remount comments — force refetch + scroll.
                     if (pathname === `/blog/${item.post.slug}`) {
