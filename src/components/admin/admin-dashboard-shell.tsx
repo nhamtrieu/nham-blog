@@ -36,9 +36,14 @@ export function AdminDashboardShell({ children, userName, userEmail }: AdminDash
               className="flex items-center gap-2 rounded-md text-sm font-semibold text-sidebar-foreground ring-sidebar-ring outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2"
               href="/admin"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                <span className="text-xs font-bold">N</span>
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt=""
+                className="size-8 shrink-0 rounded-md"
+                height={32}
+                src="/logo.png"
+                width={32}
+              />
               <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-semibold">Nham CMS</span>
                 <span className="truncate text-xs font-normal text-sidebar-foreground/70">Editorial Console</span>

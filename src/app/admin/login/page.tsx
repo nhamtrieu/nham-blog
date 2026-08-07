@@ -24,7 +24,8 @@ export default async function AdminLoginPage() {
           )}
           href="/"
         >
-          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.5)]" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="" className="size-4 rounded-sm" height={16} src="/logo.png" width={16} />
           Nham Blog Admin
         </Link>
 

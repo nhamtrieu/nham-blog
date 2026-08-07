@@ -40,7 +40,14 @@ export function HomeHeroBanner() {
         </div>
 
         <div className="flex flex-col items-start gap-5 lg:items-end">
-          <p className="text-4xl font-bold tracking-tight text-primary sm:text-5xl">{siteConfig.name}</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt={siteConfig.name}
+            className="size-20 sm:size-24"
+            height={96}
+            src="/logo.png"
+            width={96}
+          />
           <Link
             className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6 shadow-sm")}
             href="#posts"
