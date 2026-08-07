@@ -2,6 +2,7 @@ import type { EntitySchema } from "typeorm";
 
 import { Comment } from "@/entities/comment.entity";
 import { MediaAsset } from "@/entities/media-asset.entity";
+import { Notification } from "@/entities/notification.entity";
 import { Post } from "@/entities/post.entity";
 import { PostTag } from "@/entities/post-tag.entity";
 import { Tag } from "@/entities/tag.entity";
@@ -13,9 +14,10 @@ export const appEntities: Array<EntityClass | EntitySchema> = [
   User,
   Post,
   Comment,
+  Notification,
   Tag,
   PostTag,
   MediaAsset,
 ];
 
-export { Comment, MediaAsset, Post, PostTag, Tag, User };
+export { Comment, MediaAsset, Notification, Post, PostTag, Tag, User };

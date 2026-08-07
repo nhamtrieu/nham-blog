@@ -15,6 +15,15 @@ export const commentCreateSchema = z.object({
     .trim()
     .min(1, "Comment content is required.")
     .max(COMMENT_MAX_LENGTH, `Comment content must be at most ${COMMENT_MAX_LENGTH} characters.`),
+  parentId: z.uuid("Parent comment ID must be a valid UUID.").optional(),
+});
+
+export const commentUpdateSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "Comment content is required.")
+    .max(COMMENT_MAX_LENGTH, `Comment content must be at most ${COMMENT_MAX_LENGTH} characters.`),
 });
 
 export const commentModerationSchema = z.object({
@@ -38,7 +47,7 @@ export const commentAdminListQuerySchema = z.object({
 });
 
 export type CommentCreateInput = z.infer<typeof commentCreateSchema>;
-export type CommentUpdateInput = CommentCreateInput;
+export type CommentUpdateInput = z.infer<typeof commentUpdateSchema>;
 export type CommentModerationInput = z.infer<typeof commentModerationSchema>;
 export type CommentAdminListQuery = z.infer<typeof commentAdminListQuerySchema>;
 
@@ -47,7 +56,7 @@ export function validateCommentCreateInput(input: unknown): ValidationResult<Com
 }
 
 export function validateCommentUpdateInput(input: unknown): ValidationResult<CommentUpdateInput> {
-  return validateWithSchema(commentCreateSchema, input, COMMENT_VALIDATION_MESSAGE);
+  return validateWithSchema(commentUpdateSchema, input, COMMENT_VALIDATION_MESSAGE);
 }
 
 export function validateCommentModerationInput(

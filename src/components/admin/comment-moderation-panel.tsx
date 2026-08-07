@@ -130,7 +130,7 @@ export function CommentModerationPanel({ initialComments }: CommentModerationPan
       return;
     }
 
-    const shouldDelete = window.confirm("Ban co chac muon xoa binh luan nay khong?");
+    const shouldDelete = window.confirm("Bạn có chắc muốn xóa bình luận này không?");
 
     if (!shouldDelete) {
       return;
@@ -147,14 +147,14 @@ export function CommentModerationPanel({ initialComments }: CommentModerationPan
       const responseBody = await parseJsonResponse<ApiErrorResponse>(response);
 
       if (!response.ok) {
-        setErrorMessage(responseBody?.message ?? "Khong the xoa comment.");
+        setErrorMessage(responseBody?.message ?? "Không thể xóa bình luận.");
         return;
       }
 
       setComments((currentComments) => currentComments.filter((currentComment) => currentComment.id !== comment.id));
-      setFeedbackMessage("Da xoa comment.");
+      setFeedbackMessage("Đã xóa bình luận.");
     } catch {
-      setErrorMessage("Khong the ket noi toi API comments.");
+      setErrorMessage("Không thể kết nối đến API bình luận.");
     } finally {
       setBusyCommentId(null);
     }

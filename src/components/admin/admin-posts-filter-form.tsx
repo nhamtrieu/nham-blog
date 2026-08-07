@@ -88,7 +88,7 @@ export function AdminPostsFilterForm({
         {hasActiveFilters ? (
           <Button className="min-h-10" nativeButton={false} render={<Link href={resetHref} />} variant="outline">
             <X className="size-4" />
-            Xoa loc
+            Xóa lọc
           </Button>
         ) : null}
       </div>

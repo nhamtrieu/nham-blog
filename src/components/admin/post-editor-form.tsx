@@ -503,7 +503,7 @@ export function PostEditorForm({
 
         setFieldErrors(errorBody?.fields ?? {});
         setFormMessage(
-          errorBody?.message ?? "Khong the luu bai viet luc nay. Vui long thu lai."
+          errorBody?.message ?? "Không thể lưu bài viết lúc này. Vui lòng thử lại."
         );
 
         if (trigger === "autosave") {
@@ -514,7 +514,7 @@ export function PostEditorForm({
       }
 
       if (!responseBody) {
-        setFormMessage("API da tra ve mot phan hoi khong hop le. Vui long thu lai.");
+        setFormMessage("API đã trả về một phản hồi không hợp lệ. Vui lòng thử lại.");
 
         if (trigger === "autosave") {
           setAutoSaveState("error");
@@ -548,7 +548,7 @@ export function PostEditorForm({
         return false;
       }
 
-      setFormMessage("Khong the ket noi toi API luu bai viet. Vui long thu lai.");
+      setFormMessage("Không thể kết nối đến API lưu bài viết. Vui lòng thử lại.");
 
       if (trigger === "autosave") {
         setAutoSaveState("error");
@@ -1376,7 +1376,7 @@ export function PostEditorForm({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         alt="Cover preview"
-                        className="aspect-[16/10] w-full object-cover"
+                        className="aspect-16/10 w-full object-cover"
                         src={formValues.coverImageUrl}
                       />
                     </div>

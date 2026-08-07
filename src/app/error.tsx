@@ -18,12 +18,12 @@ export default function AppError({ error, reset }: AppErrorProps) {
 
   return (
     <PublicStatusPage
-      description="He thong gap su co tam thoi. Vui long thu lai. Neu loi lap lai, hay thu lai sau hoac lien he quan tri vien."
-      title="Da co loi xay ra"
+      description="Hệ thống gặp sự cố tạm thời. Vui lòng thử lại. Nếu lỗi lặp lại, hay thử lại sau hoặc liên hệ quản trị viên."
+      title="Đã có lỗi xảy ra"
       actions={
         <>
           <Button onClick={() => reset()} type="button" variant="outline">
-            Thu lai
+            Thử lại
           </Button>
           <Link className={actionLinkClass} href="/">
             Về trang chủ

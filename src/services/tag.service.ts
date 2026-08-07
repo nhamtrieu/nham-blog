@@ -8,7 +8,11 @@ import {
   ServiceError,
   type ServiceFieldErrors,
 } from "@/services/service-error";
-import type { TagCreateInput, TagUpdateInput } from "@/validators/tag.validator";
+import type {
+  TagCreateInput,
+  TagReorderInput,
+  TagUpdateInput,
+} from "@/validators/tag.validator";
 
 type DataSourceFactory = typeof initializeDataSource;
 
@@ -16,6 +20,7 @@ export type TagRecord = {
   id: string;
   name: string;
   slug: string;
+  orderNumber: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -24,6 +29,7 @@ export type TagListItem = {
   id: string;
   name: string;
   slug: string;
+  orderNumber: number;
   updatedAt: Date;
 };
 
@@ -41,6 +47,7 @@ function mapTagRecord(tag: Tag) {
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
+    orderNumber: tag.orderNumber,
     createdAt: tag.createdAt,
     updatedAt: tag.updatedAt,
   } satisfies TagRecord;
@@ -51,6 +58,7 @@ function mapTagListItem(tag: Tag) {
     id: tag.id,
     name: tag.name,
     slug: tag.slug,
+    orderNumber: tag.orderNumber,
     updatedAt: tag.updatedAt,
   } satisfies TagListItem;
 }
@@ -65,7 +73,7 @@ async function loadTagOrThrow(dataSource: Awaited<ReturnType<DataSourceFactory>>
 
   throw new ServiceError({
     code: SERVICE_ERROR_CODES.NOT_FOUND,
-    message: "Tag not found.",
+    message: "Không tìm thấy tag.",
     statusCode: 404,
   });
 }
@@ -73,7 +81,7 @@ async function loadTagOrThrow(dataSource: Awaited<ReturnType<DataSourceFactory>>
 function buildTagConflictError(fields: ServiceFieldErrors) {
   return new ServiceError({
     code: SERVICE_ERROR_CODES.CONFLICT,
-    message: Object.values(fields)[0]?.[0] ?? "Tag already exists.",
+    message: Object.values(fields)[0]?.[0] ?? "Tag đã tồn tại.",
     statusCode: 409,
     fields,
   });
@@ -97,7 +105,7 @@ async function assertTagUniqueness(
     .getOne();
 
   if (conflictingNameTag) {
-    fields.name = ["Tag name already exists."];
+    fields.name = ["Tên tag đã tồn tại."];
   }
 
   const conflictingSlugTag = await tagRepository.findOne({
@@ -112,7 +120,7 @@ async function assertTagUniqueness(
   });
 
   if (conflictingSlugTag && conflictingSlugTag.id !== options.tagId) {
-    fields.slug = ["Tag slug already exists."];
+    fields.slug = ["Slug tag đã tồn tại."];
   }
 
   if (Object.keys(fields).length > 0) {
@@ -129,7 +137,7 @@ export function createTagService(dataSourceFactory: DataSourceFactory = initiali
       if (normalizedSlug.length === 0) {
         throw new ServiceError({
           code: SERVICE_ERROR_CODES.NOT_FOUND,
-          message: "Tag not found.",
+          message: "Không tìm thấy tag.",
           statusCode: 404,
         });
       }
@@ -139,7 +147,7 @@ export function createTagService(dataSourceFactory: DataSourceFactory = initiali
       if (!tag) {
         throw new ServiceError({
           code: SERVICE_ERROR_CODES.NOT_FOUND,
-          message: "Tag not found.",
+          message: "Không tìm thấy tag.",
           statusCode: 404,
         });
       }
@@ -152,6 +160,7 @@ export function createTagService(dataSourceFactory: DataSourceFactory = initiali
       const tagRepository = dataSource.getRepository(Tag);
       const tags = await tagRepository.find({
         order: {
+          orderNumber: "ASC",
           name: "ASC",
         },
       });
@@ -169,9 +178,16 @@ export function createTagService(dataSourceFactory: DataSourceFactory = initiali
         slug,
       });
 
+      const maxOrderResult = await tagRepository
+        .createQueryBuilder("tag")
+        .select("MAX(tag.orderNumber)", "max")
+        .getRawOne<{ max: string | null }>();
+      const nextOrderNumber = Number(maxOrderResult?.max ?? 0) + 1;
+
       const tag = tagRepository.create({
         name: input.name,
         slug,
+        orderNumber: nextOrderNumber,
       });
 
       return mapTagRecord(await tagRepository.save(tag));
@@ -196,6 +212,44 @@ export function createTagService(dataSourceFactory: DataSourceFactory = initiali
       });
 
       return mapTagRecord(await tagRepository.save(updatedTag));
+    },
+
+    async reorderTags(input: TagReorderInput): Promise<TagListItem[]> {
+      const dataSource = await dataSourceFactory();
+      const tagRepository = dataSource.getRepository(Tag);
+      const existingTags = await tagRepository.find({
+        select: {
+          id: true,
+        },
+      });
+      const existingIds = new Set(existingTags.map((tag) => tag.id));
+      const orderedIds = input.orderedIds;
+
+      if (orderedIds.length !== existingIds.size || orderedIds.some((id) => !existingIds.has(id))) {
+        throw new ServiceError({
+          code: SERVICE_ERROR_CODES.INVALID_REFERENCE,
+          message: "Danh sách thứ tự phải gồm đủ tất cả tag, mỗi tag một lần.",
+          statusCode: 400,
+          fields: {
+            orderedIds: ["Danh sách thứ tự phải gồm đủ tất cả tag, mỗi tag một lần."],
+          },
+        });
+      }
+
+      await dataSource.transaction(async (manager) => {
+        const transactionalRepository = manager.getRepository(Tag);
+
+        for (const [index, tagId] of orderedIds.entries()) {
+          await transactionalRepository.update(
+            { id: tagId },
+            {
+              orderNumber: index + 1,
+            }
+          );
+        }
+      });
+
+      return this.listTags();
     },
 
     async deleteTag(tagId: string): Promise<void> {

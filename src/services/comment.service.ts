@@ -14,6 +14,7 @@ import {
   SERVICE_ERROR_CODES,
   ServiceError,
 } from "@/services/service-error";
+import { notificationService } from "@/services/notification.service";
 import type {
   CommentAdminListQuery,
   CommentCreateInput,
@@ -25,6 +26,7 @@ type DataSourceFactory = typeof initializeDataSource;
 
 export type PublicCommentItem = {
   id: string;
+  parentId: string | null;
   content: string;
   createdAt: Date;
   updatedAt: Date;
@@ -74,6 +76,8 @@ export type AdminCommentListResult = {
 
 const DEFAULT_PUBLIC_COMMENT_PAGE_SIZE = 20;
 const MAX_PUBLIC_COMMENT_PAGE_SIZE = 50;
+const MAX_COMMENT_DEPTH = 5;
+const MAX_THREAD_COMMENTS = 200;
 
 function normalizePageSize(limit: number | undefined) {
   if (!limit || !Number.isFinite(limit)) {
@@ -119,6 +123,7 @@ function createCommentCursor(comment: Pick<Comment, "id" | "createdAt">) {
 function mapPublicComment(comment: Comment): PublicCommentItem {
   return {
     id: comment.id,
+    parentId: comment.parentId,
     content: comment.content,
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
@@ -210,6 +215,82 @@ async function assertAdminExists(manager: Awaited<ReturnType<DataSourceFactory>>
   });
 }
 
+async function getCommentDepth(
+  manager: Awaited<ReturnType<DataSourceFactory>>["manager"],
+  commentId: string
+) {
+  const commentRepository = manager.getRepository(Comment);
+  let depth = 0;
+  let currentId: string | null = commentId;
+
+  while (currentId) {
+    const current = await commentRepository.findOne({
+      where: { id: currentId },
+      select: {
+        id: true,
+        parentId: true,
+      },
+    });
+
+    if (!current?.parentId) {
+      break;
+    }
+
+    depth += 1;
+    currentId = current.parentId;
+
+    if (depth > MAX_COMMENT_DEPTH) {
+      break;
+    }
+  }
+
+  return depth;
+}
+
+async function resolveParentCommentOrThrow(
+  manager: Awaited<ReturnType<DataSourceFactory>>["manager"],
+  params: {
+    parentId: string;
+    postId: string;
+  }
+) {
+  const commentRepository = manager.getRepository(Comment);
+  const parent = await commentRepository.findOne({
+    where: {
+      id: params.parentId,
+      postId: params.postId,
+      status: CommentStatus.APPROVED,
+    },
+  });
+
+  if (!parent) {
+    throw new ServiceError({
+      code: SERVICE_ERROR_CODES.INVALID_REFERENCE,
+      message: "Parent comment not found.",
+      statusCode: 400,
+      fields: {
+        parentId: ["Parent comment not found on this post."],
+      },
+    });
+  }
+
+  const parentDepth = await getCommentDepth(manager, parent.id);
+  const nextDepth = parentDepth + 1;
+
+  if (nextDepth > MAX_COMMENT_DEPTH) {
+    throw new ServiceError({
+      code: SERVICE_ERROR_CODES.CONFLICT,
+      message: `Comment replies cannot exceed depth ${MAX_COMMENT_DEPTH}.`,
+      statusCode: 400,
+      fields: {
+        parentId: [`Maximum reply depth is ${MAX_COMMENT_DEPTH}.`],
+      },
+    });
+  }
+
+  return parent;
+}
+
 export function createCommentService(dataSourceFactory: DataSourceFactory = initializeDataSource) {
   return {
     async listApprovedCommentsForPostSlug(params: {
@@ -219,10 +300,37 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
     }): Promise<PublicCommentListResult> {
       const dataSource = await dataSourceFactory();
       const normalizedSlug = params.slug.trim();
-      const normalizedLimit = normalizePageSize(params.limit);
-      const cursor = parseCommentCursor(params.cursor?.trim());
       const post = await loadPublishedPostBySlugOrThrow(dataSource.manager, normalizedSlug);
       const commentRepository = dataSource.getRepository(Comment);
+
+      // Load full thread (capped) so the UI can build a nested tree.
+      if (!params.cursor) {
+        const comments = await commentRepository.find({
+          where: {
+            postId: post.id,
+            status: CommentStatus.APPROVED,
+          },
+          order: {
+            createdAt: "ASC",
+            id: "ASC",
+          },
+          relations: {
+            author: true,
+          },
+          take: MAX_THREAD_COMMENTS,
+        });
+
+        return {
+          items: comments.map(mapPublicComment),
+          pageInfo: {
+            hasNextPage: false,
+            nextCursor: null,
+          },
+        };
+      }
+
+      const normalizedLimit = normalizePageSize(params.limit);
+      const cursor = parseCommentCursor(params.cursor?.trim());
       const where = cursor
         ? [
           {
@@ -271,15 +379,23 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
     }): Promise<PublicCommentItem> {
       const dataSource = await dataSourceFactory();
 
-      return dataSource.transaction(async (manager) => {
+      const created = await dataSource.transaction(async (manager) => {
         const [post] = await Promise.all([
           loadPublishedPostBySlugOrThrow(manager, params.slug.trim()),
           assertAuthorExists(manager, params.authorId),
         ]);
+        const parentId = params.input.parentId ?? null;
+        const parent = parentId
+          ? await resolveParentCommentOrThrow(manager, {
+            parentId,
+            postId: post.id,
+          })
+          : null;
         const commentRepository = manager.getRepository(Comment);
         const comment = commentRepository.create({
           postId: post.id,
           authorId: params.authorId,
+          parentId: parent?.id ?? null,
           content: params.input.content,
           status: CommentStatus.APPROVED,
         });
@@ -299,10 +415,40 @@ export function createCommentService(dataSourceFactory: DataSourceFactory = init
           });
         }
 
-        return mapPublicComment(loadedComment);
+        return {
+          comment: mapPublicComment(loadedComment),
+          replyNotify:
+            parent && parent.authorId !== params.authorId
+              ? {
+                userId: parent.authorId,
+                actorId: params.authorId,
+                postId: post.id,
+                commentId: loadedComment.id,
+                parentCommentId: parent.id,
+              }
+              : null,
+          postNotify:
+            !parent && post.authorId !== params.authorId
+              ? {
+                userId: post.authorId,
+                actorId: params.authorId,
+                postId: post.id,
+                commentId: loadedComment.id,
+              }
+              : null,
+        };
       });
-    },
 
+      if (created.replyNotify) {
+        await notificationService.createCommentReplyNotification(created.replyNotify);
+      }
+
+      if (created.postNotify) {
+        await notificationService.createPostCommentNotification(created.postNotify);
+      }
+
+      return created.comment;
+    },
     async listCommentsForAdmin(params: CommentAdminListQuery = {}): Promise<AdminCommentListResult> {
       const dataSource = await dataSourceFactory();
       const commentRepository = dataSource.getRepository(Comment);

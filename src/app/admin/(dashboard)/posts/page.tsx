@@ -74,7 +74,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
             Posts Workspace
           </Badge>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-            <CardTitle className="text-2xl sm:text-3xl">Bai viet</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl">Bài viết</CardTitle>
             <Button
               className="w-full shrink-0 sm:w-auto"
               nativeButton={false}
@@ -82,11 +82,11 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
               size="default"
             >
               <PlusCircle className="size-4" />
-              Tao bai viet
+              Tạo bài viết
             </Button>
           </div>
           <CardDescription className="max-w-3xl text-pretty leading-relaxed">
-            Danh sach bai viet voi filter theo status va tim theo tieu de. Giao dien chuan hoa shadcn/ui (Card, Table,
+            Danh sách bài viết với filter theo status va tìm theo tiêu đề. Giao diện chuẩn hóa theo shadcn/ui (Card, Table,
             Badge, Button).
           </CardDescription>
         </CardHeader>
@@ -126,7 +126,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
 
       <Card className="shadow-md">
         <CardHeader className="space-y-1.5 pb-2">
-          <CardTitle className="text-base">Bo loc</CardTitle>
+          <CardTitle className="text-base">Bộ lọc</CardTitle>
           <CardDescription>Tìm kiếm theo title và lọc theo trạng thái.</CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
@@ -144,7 +144,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
         <CardHeader className="border-b border-border py-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-lg">Bang bai viet</CardTitle>
+              <CardTitle className="text-lg">Bảng bài viết</CardTitle>
               <CardDescription className="mt-1">
                 Tìm thấy {posts.filteredCount} kết quả
                 {hasActiveFilters ? " theo bộ lọc hiện tại." : "."}
@@ -228,7 +228,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
                             </div>
                           </div>
                           <p className="max-w-xl pt-1 text-sm text-muted-foreground leading-relaxed sm:pt-2">
-                            {post.excerpt ?? "Chua co excerpt."}
+                            {post.excerpt ?? "Chưa có excerpt."}
                           </p>
                         </div>
                       </TableCell>
@@ -254,10 +254,10 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
                             ))}
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Chua gan tag</span>
+                          <span className="text-sm text-muted-foreground">Chưa gắn tag</span>
                         )}
                       </TableCell>
-                      <TableCell className="align-top text-muted-foreground">{post.readingTime} phut</TableCell>
+                      <TableCell className="align-top text-muted-foreground">{post.readingTime} phút</TableCell>
                       <TableCell className="align-top text-muted-foreground">{formatDate(post.updatedAt)}</TableCell>
                       <TableCell className="align-top text-muted-foreground">{formatDate(post.publishedAt)}</TableCell>
                     </TableRow>
@@ -270,7 +270,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
 
         {posts.items.length > 0 ? (
           <CardFooter className="border-t border-border px-6 py-5 text-sm text-muted-foreground">
-            Hien thi {posts.items.length} / {posts.filteredCount} ket qua trong trang nay.
+            Hiển thị {posts.items.length} / {posts.filteredCount} kết quả trong trang này.
           </CardFooter>
         ) : null}
       </Card>

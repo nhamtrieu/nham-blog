@@ -29,9 +29,9 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
           <Card className="text-center shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl">Da co loi xay ra</CardTitle>
+              <CardTitle className="text-2xl">Đã có lỗi xảy ra</CardTitle>
               <CardDescription className="text-base">
-                He thong gap su co nghiem trong. Vui long tai lai trang. Neu van de tiep tuc, hay thu lai sau.
+                Hệ thống gặp sự cố nghiêm trọng. Vui lòng tải lại trang. Nếu vấn đề tiếp tục, hay thử lại sau.
               </CardDescription>
             </CardHeader>
             <CardFooter className="flex flex-wrap justify-center gap-3">
@@ -40,7 +40,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 onClick={() => reset()}
                 type="button"
               >
-                Thu lai
+                Thử lại
               </button>
               <Link className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-full")} href="/">
                 Về trang chủ

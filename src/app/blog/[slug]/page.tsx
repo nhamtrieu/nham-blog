@@ -267,6 +267,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   ]);
   const commentViews: PublicCommentView[] = initialComments.items.map((comment) => ({
     id: comment.id,
+    parentId: comment.parentId,
     content: comment.content,
     createdAt: comment.createdAt.toISOString(),
     author: comment.author,

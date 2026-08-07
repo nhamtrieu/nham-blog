@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
+import { PublicNotificationBell } from "@/components/public/public-notification-bell";
 import { PublicSearchButton } from "@/components/public/public-search-button";
 import { PublicThemeToggle } from "@/components/public/public-theme-toggle";
 import {
@@ -82,6 +83,7 @@ export function PublicHeaderNav({ siteName, user }: PublicHeaderNavProps) {
 
           <PublicSearchButton initialQuery={searchQuery} />
           <PublicThemeToggle />
+          {user ? <PublicNotificationBell /> : null}
           <PublicUserMenu user={user} />
         </div>
       </div>

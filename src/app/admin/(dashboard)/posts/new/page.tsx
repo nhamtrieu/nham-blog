@@ -17,10 +17,10 @@ export default async function AdminPostCreatePage() {
               <PlusCircle className="size-3.5" />
               Post Creation
             </Badge>
-            <CardTitle className="text-3xl sm:text-4xl">Tao bai viet moi</CardTitle>
+            <CardTitle className="text-3xl sm:text-4xl">Tạo bài viết mới</CardTitle>
             <CardDescription className="max-w-2xl text-base">
-              Day la man editor dau tien cho posts. Sau khi tao xong, ban se duoc dua thang vao man
-              hinh chinh sua de tiep tuc hoan thien bai viet.
+              Đây là màn editor đầu tiên cho posts. Sau khi tạo xong, bạn sẽ được đưa thằng vào màn
+              hình chỉnh sửa để tiếp tục hoàn thiện bài viết.
             </CardDescription>
           </div>
           <div className="flex size-14 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-primary">

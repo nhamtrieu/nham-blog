@@ -6,9 +6,9 @@ import { UserRole } from "@/entities/user.entity";
 import { env } from "@/env";
 
 const DEFAULT_TAGS = [
-  { name: "Next.js", slug: "nextjs" },
-  { name: "TypeScript", slug: "typescript" },
-  { name: "PostgreSQL", slug: "postgresql" },
+  { name: "Next.js", slug: "nextjs", orderNumber: 1 },
+  { name: "TypeScript", slug: "typescript", orderNumber: 2 },
+  { name: "PostgreSQL", slug: "postgresql", orderNumber: 3 },
 ];
 
 async function seedAdmin() {
@@ -56,6 +56,7 @@ async function seedAdmin() {
           {
             name: tag.name,
             slug: tag.slug,
+            orderNumber: tag.orderNumber,
           }
         );
         console.log(`Updated tag: ${tag.slug}`);

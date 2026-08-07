@@ -17,8 +17,8 @@ export default async function AdminTagsPage() {
             Quản lý tags
           </Badge>
           <CardTitle className="pt-2 text-2xl sm:text-3xl">Tags</CardTitle>
-          <CardDescription className="max-w-2xl text-pretty leading-relaxed">
-            Quản lý tags theo luồng CRUD trực tiếp trong admin. Mọi thao tác tạo, sửa, xóa đều cập nhật ngay trên UI.
+          <CardDescription>
+            Quản lý tags theo luồng CRUD trực tiếp trong admin. Kéo thả để đổi thứ tự hiển thị trên trang user.
           </CardDescription>
         </CardHeader>
       </Card>

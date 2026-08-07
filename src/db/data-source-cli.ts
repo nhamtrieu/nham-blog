@@ -11,6 +11,9 @@ import { NullableUserPasswordHash1776358311794 } from "@/db/migrations/177635831
 import { UserProfileFields1776358311796 } from "@/db/migrations/1776358311796-user-profile-fields";
 import { UserAvatarUrl1776358311797 } from "@/db/migrations/1776358311797-user-avatar-url";
 import { UserRoleWriter1776358311798 } from "@/db/migrations/1776358311798-user-role-writer";
+import { CommentRepliesNotifications1776358311799 } from "@/db/migrations/1776358311799-comment-replies-notifications";
+import { NotificationPostComment1776358311800 } from "@/db/migrations/1776358311800-notification-post-comment";
+import { TagOrderNumber1776358311801 } from "@/db/migrations/1776358311801-tag-order-number";
 
 type PostgresDataSourceOptions = Extract<DataSourceOptions, { type: "postgres" }>;
 
@@ -22,6 +25,9 @@ const migrationClasses = [
   UserProfileFields1776358311796,
   UserAvatarUrl1776358311797,
   UserRoleWriter1776358311798,
+  CommentRepliesNotifications1776358311799,
+  NotificationPostComment1776358311800,
+  TagOrderNumber1776358311801,
 ];
 
 export function createCliDataSource(overrides: Partial<PostgresDataSourceOptions> = {}) {

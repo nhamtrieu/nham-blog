@@ -140,11 +140,22 @@ function mapTagSummary(tag: Tag): PostTagSummary {
   };
 }
 
+function sortTagsByOrder(tags: Tag[]) {
+  return [...tags].sort((leftTag, rightTag) => {
+    if (leftTag.orderNumber !== rightTag.orderNumber) {
+      return leftTag.orderNumber - rightTag.orderNumber;
+    }
+
+    return leftTag.name.localeCompare(rightTag.name, "vi", { sensitivity: "base" });
+  });
+}
+
 function mapPostRecord(post: Post) {
-  const tags = (post.postTags ?? [])
-    .map((postTag) => postTag.tag)
-    .filter((tag): tag is Tag => Boolean(tag))
-    .map(mapTagSummary);
+  const tags = sortTagsByOrder(
+    (post.postTags ?? [])
+      .map((postTag) => postTag.tag)
+      .filter((tag): tag is Tag => Boolean(tag))
+  ).map(mapTagSummary);
 
   return {
     id: post.id,
@@ -167,10 +178,11 @@ function mapPostRecord(post: Post) {
 }
 
 function mapPostListItem(post: Post) {
-  const tags = (post.postTags ?? [])
-    .map((postTag) => postTag.tag)
-    .filter((tag): tag is Tag => Boolean(tag))
-    .map(mapTagSummary);
+  const tags = sortTagsByOrder(
+    (post.postTags ?? [])
+      .map((postTag) => postTag.tag)
+      .filter((tag): tag is Tag => Boolean(tag))
+  ).map(mapTagSummary);
 
   return {
     id: post.id,

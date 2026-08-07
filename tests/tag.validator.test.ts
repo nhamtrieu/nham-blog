@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   validateTagCreateInput,
+  validateTagReorderInput,
   validateTagUpdateInput,
 } from "@/validators/tag.validator";
 
@@ -52,10 +53,10 @@ test("validateTagCreateInput returns field errors in the standard response shape
     success: false,
     error: {
       code: "VALIDATION_ERROR",
-      message: "Tag payload is invalid.",
+      message: "Dữ liệu tag không hợp lệ.",
       fields: {
-        name: ["Name is required."],
-        slug: ["Slug must contain letters or numbers."],
+        name: ["Tên tag là bắt buộc."],
+        slug: ["Slug phải chứa chữ hoặc số."],
       },
     },
   });
@@ -68,7 +69,7 @@ test("validateTagUpdateInput requires at least one field", () => {
     success: false,
     error: {
       code: "VALIDATION_ERROR",
-      message: "Provide at least one field to update the tag.",
+      message: "Cần ít nhất một trường để cập nhật tag.",
     },
   });
 });
@@ -89,4 +90,32 @@ test("validateTagUpdateInput accepts partial payloads and normalizes provided fi
     name: "TypeScript",
     slug: "ts-deep-dive",
   });
+});
+
+test("validateTagReorderInput accepts unique uuid list", () => {
+  const result = validateTagReorderInput({
+    orderedIds: [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ],
+  });
+
+  assert.equal(result.success, true);
+
+  if (!result.success) {
+    return;
+  }
+
+  assert.equal(result.data.orderedIds.length, 2);
+});
+
+test("validateTagReorderInput rejects duplicates", () => {
+  const result = validateTagReorderInput({
+    orderedIds: [
+      "11111111-1111-4111-8111-111111111111",
+      "11111111-1111-4111-8111-111111111111",
+    ],
+  });
+
+  assert.equal(result.success, false);
 });

@@ -97,7 +97,7 @@ export function DeletePostButton({
         }
       >
         <Trash2 className="size-3.5" />
-        Xoa
+        Xóa
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

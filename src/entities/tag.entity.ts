@@ -25,6 +25,12 @@ export class Tag {
   })
   slug!: string;
 
+  @Column({
+    name: "order_number",
+    type: "int",
+  })
+  orderNumber!: number;
+
   @CreateDateColumn({
     name: "created_at",
     type: "timestamptz",

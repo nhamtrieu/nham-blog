@@ -144,7 +144,7 @@ export function ReaderAuthForm() {
 
     if (!response.ok) {
       setFieldErrors(responseBody?.fields ?? {});
-      setErrorMessage(responseBody?.message ?? "Khong the tao tai khoan luc nay.");
+      setErrorMessage(responseBody?.message ?? "Không thể tạo tài khoản lúc này.");
       return;
     }
 

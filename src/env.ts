@@ -34,6 +34,10 @@ const envSchema = z.object({
     .optional(),
   GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().min(1).optional(),
+  REDIS_URL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+    z.string().trim().min(1).optional()
+  ),
 });
 
 function formatEnvErrors(error: z.ZodError) {
@@ -76,6 +80,7 @@ function parseEnv() {
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    REDIS_URL: process.env.REDIS_URL,
   });
 
   if (!parsed.success) {

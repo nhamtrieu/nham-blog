@@ -4,6 +4,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
@@ -37,6 +38,13 @@ export class Comment {
     type: "uuid",
   })
   authorId!: string;
+
+  @Column({
+    name: "parent_id",
+    type: "uuid",
+    nullable: true,
+  })
+  parentId!: string | null;
 
   @Column({
     type: "text",
@@ -77,6 +85,16 @@ export class Comment {
   })
   @JoinColumn({ name: "author_id" })
   author!: Relation<UserEntity>;
+
+  @ManyToOne(() => Comment, (comment) => comment.replies, {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "parent_id" })
+  parent!: Relation<Comment | null>;
+
+  @OneToMany(() => Comment, (comment) => comment.parent)
+  replies!: Relation<Comment[]>;
 
   @ManyToOne(() => User, (user) => user.moderatedComments, {
     nullable: true,

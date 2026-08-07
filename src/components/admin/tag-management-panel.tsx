@@ -1,7 +1,17 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
-import { Check, LoaderCircle, PencilLine, PlusCircle, Tags, Trash2, X } from "lucide-react";
+import { type DragEvent, type FormEvent, useRef, useState } from "react";
+import {
+  Check,
+  GripVertical,
+  LoaderCircle,
+  PencilLine,
+  PlusCircle,
+  Save,
+  Tags,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +26,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  validateTagCreateInput,
+  validateTagUpdateInput,
+} from "@/validators/tag.validator";
 
 export type TagManagementItem = {
   id: string;
   name: string;
   slug: string;
+  orderNumber: number;
 };
 
 type TagManagementPanelProps = {
@@ -38,16 +53,38 @@ type SavedTagResponse = {
   id: string;
   name: string;
   slug: string;
+  orderNumber: number;
   createdAt: string;
   updatedAt: string;
 };
 
-function sortTagsByName(tags: TagManagementItem[]) {
-  return [...tags].sort((leftTag, rightTag) =>
-    leftTag.name.localeCompare(rightTag.name, "vi", {
+type ReorderTagsResponse = {
+  items: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    orderNumber: number;
+    updatedAt: string;
+  }>;
+};
+
+function sortTagsByOrder(tags: TagManagementItem[]) {
+  return [...tags].sort((leftTag, rightTag) => {
+    if (leftTag.orderNumber !== rightTag.orderNumber) {
+      return leftTag.orderNumber - rightTag.orderNumber;
+    }
+
+    return leftTag.name.localeCompare(rightTag.name, "vi", {
       sensitivity: "base",
-    })
-  );
+    });
+  });
+}
+
+function withSequentialOrder(tags: TagManagementItem[]) {
+  return tags.map((tag, index) => ({
+    ...tag,
+    orderNumber: index + 1,
+  }));
 }
 
 function normalizeSavedTag(savedTag: SavedTagResponse): TagManagementItem {
@@ -55,7 +92,44 @@ function normalizeSavedTag(savedTag: SavedTagResponse): TagManagementItem {
     id: savedTag.id,
     name: savedTag.name,
     slug: savedTag.slug,
+    orderNumber: savedTag.orderNumber,
   };
+}
+
+function moveTag(tags: TagManagementItem[], fromIndex: number, toIndex: number) {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= tags.length ||
+    toIndex >= tags.length
+  ) {
+    return tags;
+  }
+
+  const nextTags = [...tags];
+  const [movedTag] = nextTags.splice(fromIndex, 1);
+  nextTags.splice(toIndex, 0, movedTag);
+  return withSequentialOrder(nextTags);
+}
+
+function orderedIdsEqual(leftIds: string[], rightIds: string[]) {
+  return leftIds.length === rightIds.length && leftIds.every((id, index) => id === rightIds[index]);
+}
+
+function applySavedOrder(tags: TagManagementItem[], orderedIds: string[]) {
+  const tagById = new Map(tags.map((tag) => [tag.id, tag]));
+  const orderedTags = orderedIds
+    .map((id) => tagById.get(id))
+    .filter((tag): tag is TagManagementItem => Boolean(tag));
+
+  for (const tag of tags) {
+    if (!orderedIds.includes(tag.id)) {
+      orderedTags.push(tag);
+    }
+  }
+
+  return withSequentialOrder(orderedTags);
 }
 
 async function parseJsonResponse<T>(response: Response): Promise<T | null> {
@@ -73,7 +147,10 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
 }
 
 export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
-  const [tags, setTags] = useState(() => sortTagsByName(initialTags));
+  const [tags, setTags] = useState(() => sortTagsByOrder(initialTags));
+  const [savedOrderedIds, setSavedOrderedIds] = useState(() =>
+    sortTagsByOrder(initialTags).map((tag) => tag.id)
+  );
   const [createValues, setCreateValues] = useState({
     name: "",
     slug: "",
@@ -87,11 +164,20 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
   const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string[]>>({});
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [draggingTagId, setDraggingTagId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{
+    tagId: string;
+    position: "before" | "after";
+  } | null>(null);
+  const dragTagIdRef = useRef<string | null>(null);
 
-  const isBusy = isCreating || isUpdating || deletingTagId !== null;
+  const currentOrderedIds = tags.map((tag) => tag.id);
+  const hasOrderChanges = !orderedIdsEqual(currentOrderedIds, savedOrderedIds);
+  const isBusy = isCreating || isUpdating || isSavingOrder || deletingTagId !== null;
 
   function getCreateFieldError(field: "name" | "slug") {
     return createFieldErrors[field]?.[0];
@@ -117,6 +203,141 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
     setEditFieldErrors({});
   }
 
+  async function handleSaveOrder() {
+    if (isBusy || !hasOrderChanges) {
+      return;
+    }
+
+    setIsSavingOrder(true);
+    setErrorMessage(null);
+    setFeedbackMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/tags/reorder", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderedIds: currentOrderedIds,
+        }),
+      });
+      const responseBody = await parseJsonResponse<ReorderTagsResponse | ApiErrorResponse>(response);
+
+      if (!response.ok) {
+        setErrorMessage(
+          (responseBody as ApiErrorResponse | null)?.message ??
+          "Không thể cập nhật thứ tự tag. Vui lòng thử lại."
+        );
+        return;
+      }
+
+      const reorderBody = responseBody as ReorderTagsResponse | null;
+
+      if (!reorderBody?.items) {
+        setErrorMessage("API đã trả về một phản hồi không hợp lệ. Vui lòng thử lại.");
+        return;
+      }
+
+      const nextTags = sortTagsByOrder(
+        reorderBody.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          orderNumber: item.orderNumber,
+        }))
+      );
+
+      setTags(nextTags);
+      setSavedOrderedIds(nextTags.map((tag) => tag.id));
+      setFeedbackMessage("Đã lưu thứ tự tags.");
+    } catch {
+      setErrorMessage("Không thể kết nối đến API tags. Vui lòng thử lại.");
+    } finally {
+      setIsSavingOrder(false);
+    }
+  }
+
+  function handleResetOrder() {
+    if (isBusy || !hasOrderChanges) {
+      return;
+    }
+
+    setTags((currentTags) => applySavedOrder(currentTags, savedOrderedIds));
+    setFeedbackMessage(null);
+    setErrorMessage(null);
+  }
+
+  function handleDragStart(tagId: string) {
+    if (isBusy || editingTagId) {
+      return;
+    }
+
+    dragTagIdRef.current = tagId;
+    setDraggingTagId(tagId);
+  }
+
+  function resolveDropPosition(event: DragEvent<HTMLTableRowElement>): "before" | "after" {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  }
+
+  function handleDragOver(event: DragEvent<HTMLTableRowElement>, tagId: string) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    if (!dragTagIdRef.current || dragTagIdRef.current === tagId) {
+      return;
+    }
+
+    const position = resolveDropPosition(event);
+    setDropIndicator((current) => {
+      if (current?.tagId === tagId && current.position === position) {
+        return current;
+      }
+
+      return { tagId, position };
+    });
+  }
+
+  function handleDragEnd() {
+    dragTagIdRef.current = null;
+    setDraggingTagId(null);
+    setDropIndicator(null);
+  }
+
+  function handleDrop(event: DragEvent<HTMLTableRowElement>, targetTagId: string) {
+    event.preventDefault();
+    const sourceTagId = dragTagIdRef.current;
+    const position = dropIndicator?.tagId === targetTagId
+      ? dropIndicator.position
+      : resolveDropPosition(event);
+    handleDragEnd();
+
+    if (!sourceTagId || sourceTagId === targetTagId || isBusy || editingTagId) {
+      return;
+    }
+
+    const fromIndex = tags.findIndex((tag) => tag.id === sourceTagId);
+    const targetIndex = tags.findIndex((tag) => tag.id === targetTagId);
+
+    if (fromIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    let toIndex = position === "after" ? targetIndex + 1 : targetIndex;
+
+    if (fromIndex < toIndex) {
+      toIndex -= 1;
+    }
+
+    if (fromIndex === toIndex) {
+      return;
+    }
+
+    setTags((currentTags) => moveTag(currentTags, fromIndex, toIndex));
+  }
+
   async function handleCreateTag(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -124,10 +345,22 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
       return;
     }
 
-    setIsCreating(true);
-    setCreateFieldErrors({});
     setErrorMessage(null);
     setFeedbackMessage(null);
+
+    const validationResult = validateTagCreateInput({
+      name: createValues.name,
+      slug: createValues.slug,
+    });
+
+    if (!validationResult.success) {
+      setCreateFieldErrors(validationResult.error.fields ?? {});
+      setErrorMessage(validationResult.error.fields ? null : validationResult.error.message);
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateFieldErrors({});
 
     try {
       const response = await fetch("/api/admin/tags", {
@@ -135,10 +368,7 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: createValues.name,
-          slug: createValues.slug,
-        }),
+        body: JSON.stringify(validationResult.data),
       });
       const responseBody = await parseJsonResponse<SavedTagResponse | ApiErrorResponse>(response);
 
@@ -146,26 +376,27 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
         const errorBody = responseBody as ApiErrorResponse | null;
 
         setCreateFieldErrors(errorBody?.fields ?? {});
-        setErrorMessage(errorBody?.message ?? "Khong the tao tag luc nay. Vui long thu lai.");
+        setErrorMessage(errorBody?.message ?? "Không thể tạo tag lúc này. Vui lòng thử lại.");
         return;
       }
 
       if (!responseBody) {
-        setErrorMessage("API da tra ve mot phan hoi khong hop le. Vui long thu lai.");
+        setErrorMessage("API đã trả về một phản hồi không hợp lệ. Vui lòng thử lại.");
         return;
       }
 
       const savedTag = normalizeSavedTag(responseBody as SavedTagResponse);
 
-      setTags((currentTags) => sortTagsByName([...currentTags, savedTag]));
+      setTags((currentTags) => withSequentialOrder([...currentTags, savedTag]));
+      setSavedOrderedIds((currentIds) => [...currentIds, savedTag.id]);
       setCreateValues({
         name: "",
         slug: "",
       });
       setCreateFieldErrors({});
-      setFeedbackMessage(`Da tao tag ${savedTag.name}.`);
+      setFeedbackMessage(`Đã tạo tag ${savedTag.name}.`);
     } catch {
-      setErrorMessage("Khong the ket noi toi API tags. Vui long thu lai.");
+      setErrorMessage("Không thể kết nối đến API tags. Vui lòng thử lại.");
     } finally {
       setIsCreating(false);
     }
@@ -176,10 +407,22 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
       return;
     }
 
-    setIsUpdating(true);
-    setEditFieldErrors({});
     setErrorMessage(null);
     setFeedbackMessage(null);
+
+    const validationResult = validateTagUpdateInput({
+      name: editValues.name,
+      slug: editValues.slug,
+    });
+
+    if (!validationResult.success) {
+      setEditFieldErrors(validationResult.error.fields ?? {});
+      setErrorMessage(validationResult.error.fields ? null : validationResult.error.message);
+      return;
+    }
+
+    setIsUpdating(true);
+    setEditFieldErrors({});
 
     try {
       const response = await fetch(`/api/admin/tags/${tagId}`, {
@@ -187,10 +430,7 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: editValues.name,
-          slug: editValues.slug,
-        }),
+        body: JSON.stringify(validationResult.data),
       });
       const responseBody = await parseJsonResponse<SavedTagResponse | ApiErrorResponse>(response);
 
@@ -198,27 +438,34 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
         const errorBody = responseBody as ApiErrorResponse | null;
 
         setEditFieldErrors(errorBody?.fields ?? {});
-        setErrorMessage(errorBody?.message ?? "Khong the cap nhat tag luc nay. Vui long thu lai.");
+        setErrorMessage(errorBody?.message ?? "Không thể cập nhật tag lúc này. Vui lòng thử lại.");
         return;
       }
 
       if (!responseBody) {
-        setErrorMessage("API da tra ve mot phan hoi khong hop le. Vui long thu lai.");
+        setErrorMessage("API đã trả về một phản hồi không hợp lệ. Vui lòng thử lại.");
         return;
       }
 
       const savedTag = normalizeSavedTag(responseBody as SavedTagResponse);
 
       setTags((currentTags) =>
-        sortTagsByName(
-          currentTags.map((currentTag) => (currentTag.id === savedTag.id ? savedTag : currentTag))
+        sortTagsByOrder(
+          currentTags.map((currentTag) =>
+            currentTag.id === savedTag.id
+              ? {
+                ...savedTag,
+                orderNumber: currentTag.orderNumber,
+              }
+              : currentTag
+          )
         )
       );
       setEditingTagId(null);
       setEditFieldErrors({});
-      setFeedbackMessage(`Da cap nhat tag ${savedTag.name}.`);
+      setFeedbackMessage(`Đã cập nhật tag ${savedTag.name}.`);
     } catch {
-      setErrorMessage("Khong the ket noi toi API tags. Vui long thu lai.");
+      setErrorMessage("Không thể kết nối đến API tags. Vui lòng thử lại.");
     } finally {
       setIsUpdating(false);
     }
@@ -230,7 +477,7 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
     }
 
     const shouldDelete = window.confirm(
-      `Ban co chac muon xoa tag "${tag.name}" khong? Hanh dong nay khong the hoan tac.`
+      `Bạn có chắc muốn xóa tag "${tag.name}" không? Hành động này không thể hoàn tác.`
     );
 
     if (!shouldDelete) {
@@ -249,21 +496,22 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
 
       if (!response.ok) {
         setErrorMessage(
-          responseBody?.message ?? "Khong the xoa tag luc nay. Vui long thu lai."
+          responseBody?.message ?? "Không thể xóa tag lúc này. Vui lòng thử lại."
         );
         return;
       }
 
       setTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
+      setSavedOrderedIds((currentIds) => currentIds.filter((id) => id !== tag.id));
 
       if (editingTagId === tag.id) {
         setEditingTagId(null);
         setEditFieldErrors({});
       }
 
-      setFeedbackMessage(`Da xoa tag ${tag.name}.`);
+      setFeedbackMessage(`Đã xóa tag ${tag.name}.`);
     } catch {
-      setErrorMessage("Khong the ket noi toi API tags. Vui long thu lai.");
+      setErrorMessage("Không thể kết nối đến API tags. Vui lòng thử lại.");
     } finally {
       setDeletingTagId(null);
     }
@@ -286,7 +534,10 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
         </CardHeader>
 
         <CardContent>
-          <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={handleCreateTag}>
+          <form
+            className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            onSubmit={handleCreateTag}
+          >
             <div>
               <Input
                 aria-invalid={Boolean(getCreateFieldError("name"))}
@@ -336,12 +587,12 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
               {getCreateFieldError("slug") ? (
                 <p className="mt-2 text-sm text-destructive">{getCreateFieldError("slug")}</p>
               ) : (
-                <p className="mt-2 text-xs text-muted-foreground">Co the bo trong de server tu sinh slug.</p>
+                <p className="mt-2 text-xs text-muted-foreground">Có thể bỏ trống để server tự sinh slug.</p>
               )}
             </div>
-            <Button className="h-11 sm:mt-0" disabled={isBusy} type="submit">
+            <Button disabled={isBusy} type="submit">
               {isCreating ? <LoaderCircle className="size-4 animate-spin" /> : <PlusCircle className="size-4" />}
-              Tao tag
+              Tạo tag
             </Button>
           </form>
         </CardContent>
@@ -359,9 +610,36 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
       ) : null}
 
       <Card className="gap-0 py-0 shadow-md">
-        <CardHeader className="border-b border-border">
-          <CardTitle className="text-lg">Bảng tags</CardTitle>
-          <CardDescription>Quản lý tạo, sửa, xóa tag trực tiếp trên bảng.</CardDescription>
+        <CardHeader className="flex flex-col gap-4 border-b border-border sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-lg">Bảng tags</CardTitle>
+            <CardDescription>
+              Kéo grip để sắp xếp tạm. Thả nửa dưới hàng cuối để đưa xuống cuối, rồi bấm Lưu thứ tự.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={isBusy || !hasOrderChanges}
+              onClick={handleResetOrder}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <X className="size-3.5" />
+              Hủy sắp xếp
+            </Button>
+            <Button
+              disabled={isBusy || !hasOrderChanges}
+              onClick={() => {
+                void handleSaveOrder();
+              }}
+              size="sm"
+              type="button"
+            >
+              {isSavingOrder ? <LoaderCircle className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+              Lưu thứ tự
+            </Button>
+          </div>
         </CardHeader>
 
         {tags.length === 0 ? (
@@ -378,9 +656,15 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
           </CardContent>
         ) : (
           <CardContent className="overflow-x-auto px-0 pb-6">
+            {hasOrderChanges ? (
+              <p className="border-b border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
+                Thứ tự đang thay đổi cục bộ. Bấm &quot;Lưu thứ tự&quot; để áp dụng lên trang user.
+              </p>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-20">#</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead className="w-[260px]">Actions</TableHead>
@@ -390,9 +674,50 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
                 {tags.map((tag) => {
                   const isEditing = editingTagId === tag.id;
                   const isDeleting = deletingTagId === tag.id;
+                  const isDragging = draggingTagId === tag.id;
+                  const showDropBefore =
+                    dropIndicator?.tagId === tag.id &&
+                    dropIndicator.position === "before" &&
+                    draggingTagId !== tag.id;
+                  const showDropAfter =
+                    dropIndicator?.tagId === tag.id &&
+                    dropIndicator.position === "after" &&
+                    draggingTagId !== tag.id;
 
                   return (
-                    <TableRow key={tag.id}>
+                    <TableRow
+                      className={cn(
+                        isDragging ? "opacity-50" : "",
+                        showDropBefore ? "border-t-2 border-primary" : "",
+                        showDropAfter ? "border-b-2 border-primary" : ""
+                      )}
+                      key={tag.id}
+                      onDragOver={(event) => {
+                        handleDragOver(event, tag.id);
+                      }}
+                      onDrop={(event) => {
+                        handleDrop(event, tag.id);
+                      }}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <button
+                            aria-label={`Kéo để đổi thứ tự tag ${tag.name}`}
+                            className="inline-flex size-7 cursor-grab items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={isBusy || Boolean(editingTagId)}
+                            draggable={!isBusy && !editingTagId}
+                            onDragEnd={handleDragEnd}
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "move";
+                              handleDragStart(tag.id);
+                            }}
+                            type="button"
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
+                          <span className="tabular-nums text-muted-foreground">{tag.orderNumber}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {isEditing ? (
                           <div>
@@ -525,4 +850,3 @@ export function TagManagementPanel({ initialTags }: TagManagementPanelProps) {
     </div>
   );
 }
-

@@ -6,7 +6,7 @@ import {
   validateWithSchema,
 } from "@/validators/validation";
 
-const TAG_VALIDATION_MESSAGE = "Tag payload is invalid.";
+const TAG_VALIDATION_MESSAGE = "Dữ liệu tag không hợp lệ.";
 
 function normalizeOptionalString(value: unknown) {
   if (typeof value !== "string") {
@@ -21,15 +21,15 @@ function normalizeOptionalString(value: unknown) {
 const nameFieldSchema = z
   .string()
   .trim()
-  .min(1, "Name is required.")
-  .max(120, "Name must be at most 120 characters.");
+  .min(1, "Tên tag là bắt buộc.")
+  .max(120, "Tên tag tối đa 120 ký tự.");
 
 const slugFieldSchema = z.preprocess(
   normalizeOptionalString,
   z
     .string()
-    .max(160, "Slug must be at most 160 characters.")
-    .refine((value) => /[a-zA-Z0-9]/.test(value), "Slug must contain letters or numbers.")
+    .max(160, "Slug tối đa 160 ký tự.")
+    .refine((value) => /[a-zA-Z0-9]/.test(value), "Slug phải chứa chữ hoặc số.")
     .transform((value) => slugify(value))
     .optional()
 );
@@ -50,13 +50,21 @@ export const tagUpdateSchema = z
     if (!hasAtLeastOneField) {
       context.addIssue({
         code: "custom",
-        message: "Provide at least one field to update the tag.",
+        message: "Cần ít nhất một trường để cập nhật tag.",
       });
     }
   });
 
+export const tagReorderSchema = z.object({
+  orderedIds: z
+    .array(z.string().uuid("Mỗi id tag phải là UUID hợp lệ."))
+    .min(1, "Danh sách thứ tự không được trống.")
+    .refine((ids) => new Set(ids).size === ids.length, "Danh sách thứ tự không được trùng id."),
+});
+
 export type TagCreateInput = z.infer<typeof tagCreateSchema>;
 export type TagUpdateInput = z.infer<typeof tagUpdateSchema>;
+export type TagReorderInput = z.infer<typeof tagReorderSchema>;
 
 export function validateTagCreateInput(input: unknown): ValidationResult<TagCreateInput> {
   return validateWithSchema(tagCreateSchema, input, TAG_VALIDATION_MESSAGE);
@@ -64,4 +72,8 @@ export function validateTagCreateInput(input: unknown): ValidationResult<TagCrea
 
 export function validateTagUpdateInput(input: unknown): ValidationResult<TagUpdateInput> {
   return validateWithSchema(tagUpdateSchema, input, TAG_VALIDATION_MESSAGE);
+}
+
+export function validateTagReorderInput(input: unknown): ValidationResult<TagReorderInput> {
+  return validateWithSchema(tagReorderSchema, input, TAG_VALIDATION_MESSAGE);
 }
