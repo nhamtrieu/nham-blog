@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { DataSource, type DataSourceOptions } from "typeorm";
+import { DataSource, getMetadataArgsStorage, type DataSourceOptions } from "typeorm";
 
 import { env } from "@/env";
 import { appEntities } from "@/entities";
@@ -13,6 +13,7 @@ type TypeOrmGlobalState = {
   dataSourcePromise?: Promise<DataSource>;
   dataSourceDestroyPromise?: Promise<void>;
   entityTargets?: EntityTargetSnapshot;
+  entityNamesPinned?: boolean;
 };
 
 const globalForTypeOrm = globalThis as typeof globalThis & {
@@ -25,6 +26,27 @@ function getGlobalState(): TypeOrmGlobalState {
   }
 
   return globalForTypeOrm.__nhamTypeOrm;
+}
+
+/**
+ * Next.js production minify mangles class names (Comment -> "h").
+ * TypeORM keys entity metadata by constructor.name, so mangled duplicates
+ * look like self-cycles ("h -> h"). Pin each class name to @Entity({ name }).
+ */
+function pinEntityClassNames() {
+  const state = getGlobalState();
+
+  if (state.entityNamesPinned) {
+    return;
+  }
+
+  for (const table of getMetadataArgsStorage().tables) {
+    if (typeof table.target === "function" && table.name) {
+      Object.defineProperty(table.target, "name", { value: table.name });
+    }
+  }
+
+  state.entityNamesPinned = true;
 }
 
 function requireDatabaseUrl() {
@@ -75,6 +97,8 @@ async function destroyDataSourceSafely(state: TypeOrmGlobalState) {
 export function createDataSourceOptions(
   overrides: Partial<PostgresDataSourceOptions> = {}
 ): PostgresDataSourceOptions {
+  pinEntityClassNames();
+
   return {
     type: "postgres",
     url: requireDatabaseUrl(),
