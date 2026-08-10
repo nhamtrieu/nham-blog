@@ -17,6 +17,10 @@ import { env } from "@/env";
 import { absoluteUrl } from "@/lib/absolute-url";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { extractMdxHeadings } from "@/lib/mdx-headings";
+import {
+  normalizeMdxHtmlImages,
+  parseImageSizeTitle,
+} from "@/lib/mdx/normalize-content-images";
 import { cn } from "@/lib/utils";
 import {
   SERVICE_ERROR_CODES,
@@ -225,14 +229,31 @@ function MdxOrderedList(props: ComponentPropsWithoutRef<"ol">) {
   return <ol className="mt-5 list-decimal space-y-2 pl-6 text-base leading-8 text-foreground/85" {...props} />;
 }
 
-function MdxImage({ alt, ...props }: ComponentPropsWithoutRef<"img">) {
+function MdxImage({ alt, title, className, style, width, height, ...props }: ComponentPropsWithoutRef<"img">) {
+  const sizedFromTitle = parseImageSizeTitle(typeof title === "string" ? title : undefined);
+  const resolvedWidth = width ?? sizedFromTitle.width;
+  const resolvedHeight = height ?? sizedFromTitle.height;
+  const hasExplicitSize = Boolean(resolvedWidth || resolvedHeight);
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      alt={alt ?? ""}
-      className="mt-6 w-full rounded-2xl border border-border bg-muted object-cover"
-      loading="lazy"
       {...props}
+      alt={alt ?? ""}
+      className={cn(
+        "mt-6 rounded-2xl border border-border bg-muted object-cover",
+        hasExplicitSize ? "h-auto max-w-full" : "w-full",
+        className
+      )}
+      height={resolvedHeight}
+      loading="lazy"
+      style={{
+        ...style,
+        ...(resolvedWidth ? { width: resolvedWidth } : null),
+        ...(resolvedHeight ? { height: resolvedHeight } : null),
+      }}
+      title={sizedFromTitle.width || sizedFromTitle.height ? undefined : title}
+      width={resolvedWidth}
     />
   );
 }
@@ -259,8 +280,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const pageData = await (async () => {
     try {
       const post = await loadPublishedPostBySlug(slug);
+      const contentMdx = normalizeMdxHtmlImages(post.contentMdx);
       const { content } = await compileMDX({
-        source: post.contentMdx,
+        source: contentMdx,
         components: mdxComponents,
         options: {
           blockDangerousJS: true,
@@ -272,7 +294,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         },
       });
 
-      const tocItems = extractMdxHeadings(post.contentMdx);
+      const tocItems = extractMdxHeadings(contentMdx);
 
       return {
         content,
