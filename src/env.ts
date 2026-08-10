@@ -96,6 +96,22 @@ function parseEnv() {
     throw new Error(formatEnvErrors(parsed.error));
   }
 
+  const appHost = new URL(parsed.data.APP_URL).host;
+  const authHost = new URL(parsed.data.NEXTAUTH_URL).host;
+
+  if (appHost !== authHost) {
+    throw new Error(
+      [
+        "Invalid environment configuration.",
+        "APP_URL and NEXTAUTH_URL must use the same host.",
+        `- APP_URL host: ${appHost}`,
+        `- NEXTAUTH_URL host: ${authHost}`,
+        "Mismatched hosts cause auth redirects (e.g. sign-out) to go to the wrong origin.",
+        "Reference: .env.example",
+      ].join("\n"),
+    );
+  }
+
   if (parsed.data.NODE_ENV === "production") {
     const requiredFirebaseKeys = [
       "NEXT_PUBLIC_FIREBASE_API_KEY",
