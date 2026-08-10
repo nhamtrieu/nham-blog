@@ -1,152 +1,160 @@
 import { LOGIN_RATE_LIMIT_ERROR_CODE } from "@/lib/auth/auth-error-codes";
+import { getClientIpAddress, type RequestLike } from "@/lib/auth/request-ip";
+import { getRedis } from "@/lib/redis/client";
 
-const FAILURE_WINDOW_MS = 10 * 60 * 1000;
-const BLOCK_DURATION_MS = 10 * 60 * 1000;
+const FAILURE_WINDOW_SEC = 10 * 60;
+const BLOCK_DURATION_SEC = 10 * 60;
 const MAX_FAILURES = 5;
 
-type RequestLike = {
-  headers?: Headers | Record<string, string | string[] | undefined>;
-  ip?: string;
-  socket?: {
-    remoteAddress?: string | null;
-  };
-};
-
-type LoginRateLimitEntry = {
+type MemoryEntry = {
   blockedUntil: number | null;
   failureCount: number;
   firstFailedAt: number;
-  lastAttemptAt: number;
 };
 
-type LoginRateLimitGlobalState = {
-  store: Map<string, LoginRateLimitEntry>;
+const globalMemory = globalThis as typeof globalThis & {
+  __nhamLoginRateLimitMemory?: Map<string, MemoryEntry>;
 };
 
-const globalForLoginRateLimit = globalThis as typeof globalThis & {
-  __nhamLoginRateLimit?: LoginRateLimitGlobalState;
-};
-
-function getGlobalState() {
-  if (!globalForLoginRateLimit.__nhamLoginRateLimit) {
-    globalForLoginRateLimit.__nhamLoginRateLimit = {
-      store: new Map(),
-    };
+function memoryStore() {
+  if (!globalMemory.__nhamLoginRateLimitMemory) {
+    globalMemory.__nhamLoginRateLimitMemory = new Map();
   }
 
-  return globalForLoginRateLimit.__nhamLoginRateLimit;
+  return globalMemory.__nhamLoginRateLimitMemory;
 }
 
-function readHeader(
-  headers: RequestLike["headers"],
-  headerName: string
-): string | string[] | undefined {
-  if (!headers) {
-    return undefined;
-  }
-
-  if (headers instanceof Headers) {
-    return headers.get(headerName) ?? undefined;
-  }
-
-  const normalizedHeaderName = headerName.toLowerCase();
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === normalizedHeaderName) {
-      return value;
-    }
-  }
-
-  return undefined;
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
 }
 
-function getClientIpAddress(request: RequestLike | undefined) {
-  const forwardedFor = readHeader(request?.headers, "x-forwarded-for");
-
-  if (typeof forwardedFor === "string" && forwardedFor.trim().length > 0) {
-    return forwardedFor.split(",")[0]?.trim() ?? "unknown";
-  }
-
-  if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
-    return forwardedFor[0]?.trim() || "unknown";
-  }
-
-  const realIp = readHeader(request?.headers, "x-real-ip");
-
-  if (typeof realIp === "string" && realIp.trim().length > 0) {
-    return realIp.trim();
-  }
-
-  if (typeof request?.ip === "string" && request.ip.trim().length > 0) {
-    return request.ip.trim();
-  }
-
-  if (typeof request?.socket?.remoteAddress === "string" && request.socket.remoteAddress) {
-    return request.socket.remoteAddress;
-  }
-
-  return "unknown";
+function failKey(email: string, ip: string) {
+  return `auth:login:fail:${normalizeEmail(email)}:${ip}`;
 }
 
-function getLoginRateLimitKey(email: string, request: RequestLike | undefined) {
-  return `${getClientIpAddress(request)}:${email.trim().toLowerCase()}`;
+function blockKey(email: string, ip: string) {
+  return `auth:login:block:${normalizeEmail(email)}:${ip}`;
 }
 
-function cleanupExpiredEntries(now: number) {
-  const { store } = getGlobalState();
+function emailIndexKey(email: string) {
+  return `auth:login:idx:${normalizeEmail(email)}`;
+}
 
-  for (const [key, entry] of store.entries()) {
-    const isWindowExpired = now - entry.firstFailedAt > FAILURE_WINDOW_MS;
-    const isBlockExpired = entry.blockedUntil !== null && entry.blockedUntil <= now;
+function memoryKey(email: string, ip: string) {
+  return `${normalizeEmail(email)}:${ip}`;
+}
 
-    if (isBlockExpired || isWindowExpired) {
-      store.delete(key);
-    }
+async function isBlockedRedis(email: string, ip: string) {
+  const redis = await getRedis();
+
+  if (!redis) {
+    return null;
   }
+
+  return (await redis.exists(blockKey(email, ip))) === 1;
 }
 
-export function assertLoginRateLimit(email: string, request?: RequestLike) {
+function isBlockedMemory(email: string, ip: string) {
   const now = Date.now();
+  const store = memoryStore();
+  const entry = store.get(memoryKey(email, ip));
 
-  cleanupExpiredEntries(now);
+  if (!entry) {
+    return false;
+  }
 
-  const { store } = getGlobalState();
-  const entry = store.get(getLoginRateLimitKey(email, request));
+  if (entry.blockedUntil && entry.blockedUntil > now) {
+    return true;
+  }
 
-  if (entry?.blockedUntil && entry.blockedUntil > now) {
+  if (now - entry.firstFailedAt > FAILURE_WINDOW_SEC * 1000) {
+    store.delete(memoryKey(email, ip));
+    return false;
+  }
+
+  return false;
+}
+
+export async function assertLoginRateLimit(email: string, request?: RequestLike) {
+  const ip = getClientIpAddress(request);
+  const redisBlocked = await isBlockedRedis(email, ip);
+
+  if (redisBlocked === true || (redisBlocked === null && isBlockedMemory(email, ip))) {
     throw new Error(LOGIN_RATE_LIMIT_ERROR_CODE);
   }
 }
 
-export function recordFailedLoginAttempt(email: string, request?: RequestLike) {
+export async function recordFailedLoginAttempt(email: string, request?: RequestLike) {
+  const ip = getClientIpAddress(request);
+  const redis = await getRedis();
+
+  if (redis) {
+    const fKey = failKey(email, ip);
+    const bKey = blockKey(email, ip);
+    const idxKey = emailIndexKey(email);
+    const count = await redis.incr(fKey);
+
+    if (count === 1) {
+      await redis.expire(fKey, FAILURE_WINDOW_SEC);
+    }
+
+    await redis.sadd(idxKey, ip);
+    await redis.expire(idxKey, FAILURE_WINDOW_SEC + BLOCK_DURATION_SEC);
+
+    if (count >= MAX_FAILURES) {
+      await redis.set(bKey, "1", "EX", BLOCK_DURATION_SEC);
+    }
+
+    return;
+  }
+
   const now = Date.now();
+  const store = memoryStore();
+  const key = memoryKey(email, ip);
+  const existing = store.get(key);
 
-  cleanupExpiredEntries(now);
-
-  const { store } = getGlobalState();
-  const key = getLoginRateLimitKey(email, request);
-  const existingEntry = store.get(key);
-
-  if (!existingEntry || now - existingEntry.firstFailedAt > FAILURE_WINDOW_MS) {
+  if (!existing || now - existing.firstFailedAt > FAILURE_WINDOW_SEC * 1000) {
     store.set(key, {
       blockedUntil: null,
       failureCount: 1,
       firstFailedAt: now,
-      lastAttemptAt: now,
     });
     return;
   }
 
-  const failureCount = existingEntry.failureCount + 1;
-
+  const failureCount = existing.failureCount + 1;
   store.set(key, {
-    ...existingEntry,
-    blockedUntil: failureCount >= MAX_FAILURES ? now + BLOCK_DURATION_MS : null,
+    ...existing,
+    blockedUntil: failureCount >= MAX_FAILURES ? now + BLOCK_DURATION_SEC * 1000 : null,
     failureCount,
-    lastAttemptAt: now,
   });
 }
 
-export function clearFailedLoginAttempts(email: string, request?: RequestLike) {
-  getGlobalState().store.delete(getLoginRateLimitKey(email, request));
+export async function clearFailedLoginAttempts(email: string, request?: RequestLike) {
+  const normalized = normalizeEmail(email);
+  const ip = getClientIpAddress(request);
+  const redis = await getRedis();
+
+  if (redis) {
+    const idxKey = emailIndexKey(normalized);
+    const ips = await redis.smembers(idxKey);
+    const targets = new Set(ips.length > 0 ? ips : [ip]);
+    targets.add(ip);
+
+    const keys: string[] = [idxKey];
+
+    for (const memberIp of targets) {
+      keys.push(failKey(normalized, memberIp), blockKey(normalized, memberIp));
+    }
+
+    await redis.del(...keys);
+  }
+
+  const store = memoryStore();
+
+  for (const key of [...store.keys()]) {
+    if (key.startsWith(`${normalized}:`)) {
+      store.delete(key);
+    }
+  }
 }

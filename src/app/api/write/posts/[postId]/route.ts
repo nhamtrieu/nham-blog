@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isWriterSession } from "@/lib/auth/authorization";
 import { toWriterUpdateInput } from "@/lib/write/writer-post-payload";
 import { postService } from "@/services";
@@ -65,6 +66,12 @@ export async function PATCH(request: Request, { params }: PostRouteContext) {
       return unauthorizedJson();
     }
 
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
+    }
+
     userId = session.user.id;
 
     let requestBody: unknown;
@@ -115,6 +122,12 @@ export async function DELETE(_request: Request, { params }: PostRouteContext) {
 
     if (!isWriterSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;

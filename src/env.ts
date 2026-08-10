@@ -38,6 +38,12 @@ const envSchema = z.object({
     (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
     z.string().trim().min(1).optional()
   ),
+  RABBITMQ_URL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+    z.string().trim().min(1).optional()
+  ),
+  RESEND_API_KEY: z.string().trim().min(1).optional(),
+  EMAIL_FROM: z.string().trim().min(1).optional(),
 });
 
 function formatEnvErrors(error: z.ZodError) {
@@ -81,6 +87,9 @@ function parseEnv() {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     REDIS_URL: process.env.REDIS_URL,
+    RABBITMQ_URL: process.env.RABBITMQ_URL,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
   });
 
   if (!parsed.success) {

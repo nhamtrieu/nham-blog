@@ -32,6 +32,7 @@ async function seedAdmin() {
           name: env.ADMIN_NAME,
           passwordHash,
           role: UserRole.ADMIN,
+          emailVerifiedAt: existingUser.emailVerifiedAt ?? new Date(),
         }
       );
       console.log(`Updated admin user: ${env.ADMIN_EMAIL}`);
@@ -41,6 +42,7 @@ async function seedAdmin() {
         name: env.ADMIN_NAME,
         passwordHash,
         role: UserRole.ADMIN,
+        emailVerifiedAt: new Date(),
       });
       console.log(`Created admin user: ${env.ADMIN_EMAIL}`);
     }

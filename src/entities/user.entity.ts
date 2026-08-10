@@ -110,6 +110,13 @@ export class User {
   })
   avatarUrl!: string | null;
 
+  @Column({
+    name: "email_verified_at",
+    type: "timestamptz",
+    nullable: true,
+  })
+  emailVerifiedAt!: Date | null;
+
   @OneToMany(() => Post, (post) => post.author)
   posts!: Relation<PostEntity[]>;
 

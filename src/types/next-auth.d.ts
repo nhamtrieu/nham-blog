@@ -10,6 +10,8 @@ declare module "next-auth" {
       name: string | null;
       role: UserRole;
       avatarUrl: string | null;
+      emailVerified: boolean;
+      createdAt: string | null;
     };
   }
 
@@ -19,6 +21,8 @@ declare module "next-auth" {
     name: string | null;
     role: UserRole;
     avatarUrl?: string | null;
+    emailVerified?: boolean;
+    createdAt?: string;
   }
 }
 
@@ -27,6 +31,8 @@ declare module "next-auth/jwt" {
     userId?: string;
     role?: UserRole;
     avatarUrl?: string | null;
+    emailVerified?: boolean;
+    createdAt?: string | null;
     roleSyncedAt?: number;
   }
 }

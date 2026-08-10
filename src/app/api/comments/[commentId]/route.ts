@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { commentService } from "@/services";
 import { validateCommentUpdateInput } from "@/validators/comment.validator";
@@ -30,6 +31,12 @@ export async function PATCH(request: Request, { params }: CommentRouteContext) {
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;
@@ -81,6 +88,12 @@ export async function DELETE(request: Request, { params }: CommentRouteContext) 
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;

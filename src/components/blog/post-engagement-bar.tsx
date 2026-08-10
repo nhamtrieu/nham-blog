@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useState } from "react";
 import {
   Bookmark,
@@ -9,6 +10,7 @@ import {
   Link2,
 } from "lucide-react";
 
+import { isVerificationGraceExpired } from "@/lib/auth/email-verification";
 import { cn } from "@/lib/utils";
 
 type EngagementState = {
@@ -57,9 +59,12 @@ export function PostEngagementBar({
   orientation = "vertical",
   className,
 }: PostEngagementBarProps) {
+  const { data: session } = useSession();
+  const interactionsLocked = isVerificationGraceExpired(session?.user);
   const [engagement, setEngagement] = useState(initialEngagement);
   const [busyAction, setBusyAction] = useState<"like" | "save" | "copy" | null>(null);
   const [copied, setCopied] = useState(false);
+  const [lockHint, setLockHint] = useState(false);
 
   async function mutateEngagement(
     action: "like" | "save",
@@ -67,6 +72,11 @@ export function PostEngagementBar({
   ) {
     if (!isAuthenticated) {
       window.location.href = loginHref;
+      return;
+    }
+
+    if (interactionsLocked) {
+      setLockHint(true);
       return;
     }
 
@@ -116,110 +126,117 @@ export function PostEngagementBar({
     "inline-flex size-10 items-center justify-center rounded-full text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50";
 
   return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-border bg-card p-1.5 shadow-sm",
-        orientation === "horizontal" ? "flex-row flex-wrap" : "flex-col",
-        className
-      )}
-    >
-      <button
-        aria-label={engagement.likedByMe ? "Bỏ thích bài viết" : "Thích bài viết"}
-        aria-pressed={engagement.likedByMe}
+    <div className="inline-flex flex-col items-center gap-1">
+      <div
         className={cn(
-          iconButtonClass,
-          engagement.likedByMe && "text-destructive hover:bg-destructive/10"
-        )}
-        disabled={busyAction === "like"}
-        onClick={() => {
-          void mutateEngagement("like", engagement.likedByMe ? "DELETE" : "POST");
-        }}
-        type="button"
-      >
-        {busyAction === "like" ? (
-          <LoaderCircle className="size-4 animate-spin" />
-        ) : (
-          <Heart className={cn("size-4", engagement.likedByMe && "fill-current")} />
-        )}
-      </button>
-
-      <span
-        className={cn(
-          "min-w-6 text-center text-xs tabular-nums text-muted-foreground",
-          orientation === "vertical" && "pb-1"
+          "inline-flex items-center gap-1 rounded-full border border-border bg-card p-1.5 shadow-sm",
+          orientation === "horizontal" ? "flex-row flex-wrap" : "flex-col",
+          className
         )}
       >
-        {engagement.likeCount}
-      </span>
-
-      {isAuthenticated ? (
         <button
-          aria-label={engagement.savedByMe ? "Bỏ lưu bài viết" : "Lưu bài viết"}
-          aria-pressed={engagement.savedByMe}
+          aria-label={engagement.likedByMe ? "Bỏ thích bài viết" : "Thích bài viết"}
+          aria-pressed={engagement.likedByMe}
           className={cn(
             iconButtonClass,
-            engagement.savedByMe && "text-primary hover:bg-primary/10"
+            engagement.likedByMe && "text-destructive hover:bg-destructive/10"
           )}
-          disabled={busyAction === "save"}
+          disabled={busyAction === "like"}
           onClick={() => {
-            void mutateEngagement("save", engagement.savedByMe ? "DELETE" : "POST");
+            void mutateEngagement("like", engagement.likedByMe ? "DELETE" : "POST");
           }}
           type="button"
         >
-          {busyAction === "save" ? (
+          {busyAction === "like" ? (
             <LoaderCircle className="size-4 animate-spin" />
           ) : (
-            <Bookmark className={cn("size-4", engagement.savedByMe && "fill-current")} />
+            <Heart className={cn("size-4", engagement.likedByMe && "fill-current")} />
           )}
         </button>
-      ) : (
-        <Link aria-label="Đăng nhập để lưu bài viết" className={iconButtonClass} href={loginHref}>
-          <Bookmark className="size-4" />
-        </Link>
-      )}
 
-      <a
-        aria-label="Chia sẻ Facebook"
-        className={iconButtonClass}
-        href={shareHref("facebook", url, title)}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <BrandGlyph label="f" />
-      </a>
-      <a
-        aria-label="Chia sẻ Twitter"
-        className={iconButtonClass}
-        href={shareHref("twitter", url, title)}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <BrandGlyph label="X" />
-      </a>
-      <a
-        aria-label="Chia sẻ LinkedIn"
-        className={iconButtonClass}
-        href={shareHref("linkedin", url, title)}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <BrandGlyph label="in" />
-      </a>
-      <button
-        aria-label={copied ? "Đã sao chép link" : "Sao chép link"}
-        className={iconButtonClass}
-        disabled={busyAction === "copy"}
-        onClick={() => {
-          void handleCopyLink();
-        }}
-        type="button"
-      >
-        {busyAction === "copy" ? (
-          <LoaderCircle className="size-4 animate-spin" />
+        <span
+          className={cn(
+            "min-w-6 text-center text-xs tabular-nums text-muted-foreground",
+            orientation === "vertical" && "pb-1"
+          )}
+        >
+          {engagement.likeCount}
+        </span>
+
+        {isAuthenticated ? (
+          <button
+            aria-label={engagement.savedByMe ? "Bỏ lưu bài viết" : "Lưu bài viết"}
+            aria-pressed={engagement.savedByMe}
+            className={cn(
+              iconButtonClass,
+              engagement.savedByMe && "text-primary hover:bg-primary/10"
+            )}
+            disabled={busyAction === "save"}
+            onClick={() => {
+              void mutateEngagement("save", engagement.savedByMe ? "DELETE" : "POST");
+            }}
+            type="button"
+          >
+            {busyAction === "save" ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Bookmark className={cn("size-4", engagement.savedByMe && "fill-current")} />
+            )}
+          </button>
         ) : (
-          <Link2 className={cn("size-4", copied && "text-primary")} />
+          <Link aria-label="Đăng nhập để lưu bài viết" className={iconButtonClass} href={loginHref}>
+            <Bookmark className="size-4" />
+          </Link>
         )}
-      </button>
+
+        <a
+          aria-label="Chia sẻ Facebook"
+          className={iconButtonClass}
+          href={shareHref("facebook", url, title)}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <BrandGlyph label="f" />
+        </a>
+        <a
+          aria-label="Chia sẻ Twitter"
+          className={iconButtonClass}
+          href={shareHref("twitter", url, title)}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <BrandGlyph label="X" />
+        </a>
+        <a
+          aria-label="Chia sẻ LinkedIn"
+          className={iconButtonClass}
+          href={shareHref("linkedin", url, title)}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <BrandGlyph label="in" />
+        </a>
+        <button
+          aria-label={copied ? "Đã sao chép link" : "Sao chép link"}
+          className={iconButtonClass}
+          disabled={busyAction === "copy"}
+          onClick={() => {
+            void handleCopyLink();
+          }}
+          type="button"
+        >
+          {busyAction === "copy" ? (
+            <LoaderCircle className="size-4 animate-spin" />
+          ) : (
+            <Link2 className={cn("size-4", copied && "text-primary")} />
+          )}
+        </button>
+      </div>
+      {lockHint || interactionsLocked ? (
+        <p className="max-w-40 text-center text-[10px] leading-snug text-destructive">
+          Xác thực email để thích/lưu
+        </p>
+      ) : null}
     </div>
   );
 }

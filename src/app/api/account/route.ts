@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { accountProfileService } from "@/services/account-profile.service";
 import { validateAccountProfileUpdateInput } from "@/validators/account-profile.validator";
@@ -55,6 +56,12 @@ export async function PATCH(request: Request) {
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;

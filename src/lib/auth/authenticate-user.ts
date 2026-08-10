@@ -12,6 +12,8 @@ export type AuthenticatedUser = {
   name: string | null;
   role: UserRole;
   avatarUrl: string | null;
+  emailVerified: boolean;
+  createdAt: string;
 };
 
 export async function authenticateUserWithCredentials(
@@ -43,6 +45,8 @@ export async function authenticateUserWithCredentials(
       name: user.name,
       role: user.role,
       avatarUrl: user.avatarUrl,
+      emailVerified: Boolean(user.emailVerifiedAt),
+      createdAt: user.createdAt.toISOString(),
     };
   });
 }

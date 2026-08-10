@@ -40,10 +40,10 @@ export function createReaderAuthService(dataSourceFactory: DataSourceFactory = i
       if (existingUser) {
         throw new ServiceError({
           code: SERVICE_ERROR_CODES.CONFLICT,
-          message: "Email is already registered.",
+          message: "Email này đã được đăng ký.",
           statusCode: 409,
           fields: {
-            email: ["Email is already registered."],
+            email: ["Email này đã được đăng ký."],
           },
         });
       }
@@ -54,6 +54,7 @@ export function createReaderAuthService(dataSourceFactory: DataSourceFactory = i
         name: input.name,
         passwordHash,
         role: UserRole.READER,
+        emailVerifiedAt: null,
       });
 
       return mapReader(await userRepository.save(user));

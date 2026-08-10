@@ -75,9 +75,11 @@ export function ReaderAuthForm() {
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isPending, startTransition] = useTransition();
   const callbackUrl = normalizeDestination(searchParams.get("callbackUrl"));
+  const verifiedParam = searchParams.get("verified");
 
   function getFieldError(field: "email" | "name" | "password") {
     return fieldErrors[field]?.[0];
@@ -85,6 +87,7 @@ export function ReaderAuthForm() {
 
   function clearMessages(field?: "email" | "name" | "password") {
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     if (!field) {
       setFieldErrors({});
@@ -109,7 +112,11 @@ export function ReaderAuthForm() {
     });
 
     if (!result || result.error) {
-      setErrorMessage("Email hoặc mật khẩu không đúng.");
+      setErrorMessage(
+        result?.error === "LoginRateLimit"
+          ? "Bạn đã thử đăng nhập quá nhiều lần. Đợi khoảng 10 phút rồi thử lại."
+          : "Email hoặc mật khẩu không đúng."
+      );
       return;
     }
 
@@ -140,7 +147,9 @@ export function ReaderAuthForm() {
       },
       body: JSON.stringify(formValues),
     });
-    const responseBody = await parseJsonResponse<ApiErrorResponse>(response);
+    const responseBody = await parseJsonResponse<ApiErrorResponse & { verificationEmailWarning?: string }>(
+      response
+    );
 
     if (!response.ok) {
       setFieldErrors(responseBody?.fields ?? {});
@@ -148,7 +157,12 @@ export function ReaderAuthForm() {
       return;
     }
 
-    await submitLogin();
+    setMode("login");
+    setSuccessMessage(
+      responseBody?.verificationEmailWarning
+        ? `${responseBody.verificationEmailWarning} Hãy đăng nhập.`
+        : "Tạo tài khoản thành công. Kiểm tra email để xác thực, rồi đăng nhập."
+    );
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -179,6 +193,16 @@ export function ReaderAuthForm() {
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {verifiedParam === "1" ? (
+            <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+              Email đã được xác thực. Bạn có thể đăng nhập.
+            </p>
+          ) : null}
+          {verifiedParam === "0" ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              Link xác thực không hợp lệ hoặc đã hết hạn. Đăng nhập rồi bấm Gửi lại email.
+            </p>
+          ) : null}
           {mode === "register" ? (
             <div className="space-y-2">
               <Label htmlFor="reader-name">Tên hiển thị</Label>
@@ -259,6 +283,12 @@ export function ReaderAuthForm() {
           {errorMessage ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {errorMessage}
+            </div>
+          ) : null}
+
+          {successMessage ? (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+              {successMessage}
             </div>
           ) : null}
 

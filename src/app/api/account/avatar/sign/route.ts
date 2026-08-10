@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getServerAuthSession } from "@/auth";
 import { jsonError, unauthorizedJson } from "@/lib/api/api-errors";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import {
   CLOUDINARY_AVATAR_FOLDER,
@@ -14,6 +15,12 @@ export async function POST() {
 
   if (!isAuthenticatedSession(session)) {
     return unauthorizedJson();
+  }
+
+  const verificationBlock = emailVerificationBlockedJson(session);
+
+  if (verificationBlock) {
+    return verificationBlock;
   }
 
   if (!isCloudinaryConfigured()) {

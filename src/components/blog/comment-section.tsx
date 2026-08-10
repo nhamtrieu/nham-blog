@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { isVerificationGraceExpired } from "@/lib/auth/email-verification";
 import { cn } from "@/lib/utils";
 
 export type PublicCommentView = {
@@ -216,6 +218,8 @@ export function CommentSection({
   currentUser,
   initialComments,
 }: CommentSectionProps) {
+  const { data: session } = useSession();
+  const interactionsLocked = isVerificationGraceExpired(session?.user);
   const [comments, setComments] = useState(initialComments);
   const [content, setContent] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -893,7 +897,12 @@ export function CommentSection({
       </AlertDialog>
 
       <div className="mt-6 rounded-xl border border-border bg-background p-4">
-        {currentUser ? (
+        {currentUser && interactionsLocked ? (
+          <p className="text-sm text-destructive">
+            Email chưa xác thực quá 1 ngày — bình luận đã bị khóa. Hãy xác thực email (banner phía trên)
+            để tiếp tục.
+          </p>
+        ) : currentUser ? (
           <form className="space-y-3" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Textarea

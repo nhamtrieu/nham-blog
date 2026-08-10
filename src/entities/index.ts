@@ -1,6 +1,7 @@
 import type { EntitySchema } from "typeorm";
 
 import { Comment } from "@/entities/comment.entity";
+import { EmailVerificationToken } from "@/entities/email-verification-token.entity";
 import { MediaAsset } from "@/entities/media-asset.entity";
 import { Notification } from "@/entities/notification.entity";
 import { Post } from "@/entities/post.entity";
@@ -14,6 +15,7 @@ type EntityClass = abstract new (...args: never[]) => object;
 
 export const appEntities: Array<EntityClass | EntitySchema> = [
   User,
+  EmailVerificationToken,
   Post,
   Comment,
   Notification,
@@ -26,6 +28,7 @@ export const appEntities: Array<EntityClass | EntitySchema> = [
 
 export {
   Comment,
+  EmailVerificationToken,
   MediaAsset,
   Notification,
   Post,

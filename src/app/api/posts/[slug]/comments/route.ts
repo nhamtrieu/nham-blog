@@ -13,6 +13,7 @@ import {
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
 import { assertCommentRateLimit } from "@/lib/api/comment-rate-limit";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { commentService } from "@/services";
 import { validateCommentCreateInput } from "@/validators/comment.validator";
@@ -62,6 +63,12 @@ export async function POST(request: Request, { params }: CommentsRouteContext) {
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;

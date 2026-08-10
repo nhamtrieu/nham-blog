@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getServerAuthSession } from "@/auth";
 import { jsonError, unauthorizedJson } from "@/lib/api/api-errors";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isWriterSession } from "@/lib/auth/authorization";
 import {
   createSignedUploadPayload,
@@ -13,6 +14,12 @@ export async function POST() {
 
   if (!isWriterSession(session)) {
     return unauthorizedJson();
+  }
+
+  const verificationBlock = emailVerificationBlockedJson(session);
+
+  if (verificationBlock) {
+    return verificationBlock;
   }
 
   if (!isCloudinaryConfigured()) {

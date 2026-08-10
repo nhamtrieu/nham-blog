@@ -6,7 +6,7 @@ import { env } from "@/env";
 import { UserRole } from "@/entities/user.entity";
 import { authenticateUserWithCredentials } from "@/lib/auth/authenticate-user";
 import { ADMIN_LOGIN_PATH } from "@/lib/auth/auth-routes";
-import { loadUserRoleById } from "@/lib/auth/load-user-role";
+import { loadUserAuthStateById } from "@/lib/auth/load-user-role";
 import {
   assertLoginRateLimit,
   clearFailedLoginAttempts,
@@ -17,7 +17,7 @@ import { googleAuthService } from "@/services/google-auth.service";
 
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
-/** Refresh role from DB at most this often — not every request. */
+/** Refresh role / verification from DB at most this often — not every request. */
 const ROLE_SYNC_INTERVAL_MS = 30_000;
 const shouldUseSecureCookies = env.NEXTAUTH_URL.startsWith("https://");
 const hasGoogleOAuth = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -57,16 +57,16 @@ export const authOptions = {
           return null;
         }
 
-        assertLoginRateLimit(parsedCredentials.data.email, request);
+        await assertLoginRateLimit(parsedCredentials.data.email, request);
 
         const user = await authenticateUserWithCredentials(parsedCredentials.data);
 
         if (!user) {
-          recordFailedLoginAttempt(parsedCredentials.data.email, request);
+          await recordFailedLoginAttempt(parsedCredentials.data.email, request);
           return null;
         }
 
-        clearFailedLoginAttempts(parsedCredentials.data.email, request);
+        await clearFailedLoginAttempts(parsedCredentials.data.email, request);
 
         return user;
       },
@@ -106,6 +106,8 @@ export const authOptions = {
       user.name = resolved.user.name;
       user.role = resolved.user.role;
       user.avatarUrl = resolved.user.avatarUrl;
+      user.emailVerified = resolved.user.emailVerified;
+      user.createdAt = resolved.user.createdAt;
 
       return true;
     },
@@ -116,6 +118,8 @@ export const authOptions = {
         token.name = user.name;
         token.role = user.role;
         token.avatarUrl = user.avatarUrl ?? null;
+        token.emailVerified = Boolean(user.emailVerified);
+        token.createdAt = typeof user.createdAt === "string" ? user.createdAt : null;
         token.roleSyncedAt = Date.now();
       }
 
@@ -132,16 +136,21 @@ export const authOptions = {
 
       const userId = typeof token.userId === "string" ? token.userId : token.sub;
       const roleSyncedAt = typeof token.roleSyncedAt === "number" ? token.roleSyncedAt : 0;
-      const shouldSyncRole =
-        typeof userId === "string" && Date.now() - roleSyncedAt >= ROLE_SYNC_INTERVAL_MS;
+      const shouldSyncAuthState =
+        typeof userId === "string" &&
+        (trigger === "update" || Date.now() - roleSyncedAt >= ROLE_SYNC_INTERVAL_MS);
 
-      if (shouldSyncRole) {
-        const role = await loadUserRoleById(userId);
+      if (shouldSyncAuthState) {
+        const authState = await loadUserAuthStateById(userId);
 
-        if (role) {
-          token.role = role;
+        // User deleted — drop JWT so the cookie session dies.
+        if (!authState) {
+          return null as unknown as typeof token;
         }
 
+        token.role = authState.role;
+        token.emailVerified = authState.emailVerified;
+        token.createdAt = authState.createdAt;
         token.roleSyncedAt = Date.now();
       }
 
@@ -162,6 +171,9 @@ export const authOptions = {
         session.user.role = token.role ?? UserRole.READER;
         session.user.avatarUrl =
           typeof token.avatarUrl === "string" ? token.avatarUrl : null;
+        session.user.emailVerified = Boolean(token.emailVerified);
+        session.user.createdAt =
+          typeof token.createdAt === "string" ? token.createdAt : null;
       }
 
       return session;

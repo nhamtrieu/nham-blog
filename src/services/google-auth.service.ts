@@ -64,6 +64,7 @@ export function createGoogleAuthService(dataSourceFactory: DataSourceFactory = i
           name: identity.name,
           passwordHash: null,
           role: UserRole.READER,
+          emailVerifiedAt: new Date(),
         });
         const savedUser = await userRepository.save(user);
 
@@ -75,6 +76,8 @@ export function createGoogleAuthService(dataSourceFactory: DataSourceFactory = i
             name: savedUser.name,
             role: savedUser.role,
             avatarUrl: savedUser.avatarUrl,
+            emailVerified: Boolean(savedUser.emailVerifiedAt),
+            createdAt: savedUser.createdAt.toISOString(),
           },
         };
       }
@@ -88,6 +91,12 @@ export function createGoogleAuthService(dataSourceFactory: DataSourceFactory = i
         await userRepository.save(existingUser);
       }
 
+      // Google already verified the address — heal null for older linked accounts.
+      if (!existingUser.emailVerifiedAt) {
+        existingUser.emailVerifiedAt = new Date();
+        await userRepository.save(existingUser);
+      }
+
       return {
         ok: true,
         user: {
@@ -96,6 +105,8 @@ export function createGoogleAuthService(dataSourceFactory: DataSourceFactory = i
           name: existingUser.name,
           role: existingUser.role,
           avatarUrl: existingUser.avatarUrl,
+          emailVerified: Boolean(existingUser.emailVerifiedAt),
+          createdAt: existingUser.createdAt.toISOString(),
         },
       };
     },

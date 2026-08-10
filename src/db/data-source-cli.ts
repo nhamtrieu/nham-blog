@@ -15,6 +15,7 @@ import { CommentRepliesNotifications1776358311799 } from "@/db/migrations/177635
 import { NotificationPostComment1776358311800 } from "@/db/migrations/1776358311800-notification-post-comment";
 import { TagOrderNumber1776358311801 } from "@/db/migrations/1776358311801-tag-order-number";
 import { PostLikesSavesNotifications1776358311802 } from "@/db/migrations/1776358311802-post-likes-saves-notifications";
+import { EmailVerification1776358311803 } from "@/db/migrations/1776358311803-email-verification";
 
 type PostgresDataSourceOptions = Extract<DataSourceOptions, { type: "postgres" }>;
 
@@ -30,6 +31,7 @@ const migrationClasses = [
   NotificationPostComment1776358311800,
   TagOrderNumber1776358311801,
   PostLikesSavesNotifications1776358311802,
+  EmailVerification1776358311803,
 ];
 
 export function createCliDataSource(overrides: Partial<PostgresDataSourceOptions> = {}) {

@@ -6,6 +6,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import { postEngagementService } from "@/services";
 
@@ -24,6 +25,12 @@ export async function POST(request: Request, { params }: LikeRouteContext) {
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;
@@ -59,6 +66,12 @@ export async function DELETE(request: Request, { params }: LikeRouteContext) {
 
     if (!isAuthenticatedSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;

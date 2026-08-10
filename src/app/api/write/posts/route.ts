@@ -11,6 +11,7 @@ import {
   getRequestId,
   logApiServerErrorAndRespond,
 } from "@/lib/api/api-logging";
+import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isWriterSession } from "@/lib/auth/authorization";
 import { toWriterCreateInput } from "@/lib/write/writer-post-payload";
 import { postService } from "@/services";
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
 
     if (!isWriterSession(session)) {
       return unauthorizedJson();
+    }
+
+    const verificationBlock = emailVerificationBlockedJson(session);
+
+    if (verificationBlock) {
+      return verificationBlock;
     }
 
     userId = session.user.id;
