@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Check, FileText } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
-import { cn } from "@/lib/utils";
 
 const HERO_POINTS = [
   "Ghi chú kỹ thuật thực chiến",
@@ -48,12 +47,14 @@ export function HomeHeroBanner() {
             src="/logo.png"
             width={96}
           />
-          <Link
-            className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6 shadow-sm")}
-            href="#posts"
+          <Button
+            className="rounded-full px-6 shadow-sm"
+            nativeButton={false}
+            render={<Link href="blog" />}
+            size="lg"
           >
             Xem bài viết
-          </Link>
+          </Button>
         </div>
       </div>
     </section>

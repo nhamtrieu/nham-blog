@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: CommentsRouteContext) {
 
     userId = session.user.id;
 
-    const rateLimit = assertCommentRateLimit(request, userId);
+    const rateLimit = await assertCommentRateLimit(request, userId);
 
     if (rateLimit) {
       return jsonError(

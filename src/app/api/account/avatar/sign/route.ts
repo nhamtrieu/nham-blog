@@ -5,6 +5,7 @@ import { jsonError, unauthorizedJson } from "@/lib/api/api-errors";
 import { emailVerificationBlockedJson } from "@/lib/api/email-verification-guard";
 import { isAuthenticatedSession } from "@/lib/auth/authorization";
 import {
+  CLOUDINARY_AVATAR_ALLOWED_FORMATS,
   CLOUDINARY_AVATAR_FOLDER,
   createSignedUploadPayload,
   isCloudinaryConfigured,
@@ -35,6 +36,7 @@ export async function POST() {
 
   return NextResponse.json(
     createSignedUploadPayload({
+      allowedFormats: CLOUDINARY_AVATAR_ALLOWED_FORMATS,
       folder: CLOUDINARY_AVATAR_FOLDER,
     })
   );

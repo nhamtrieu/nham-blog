@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, LoaderCircle, LogIn, UserPlus } from "lucide-react";
-import { type FormEvent, useState, useTransition } from "react";
+import { type FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,9 +77,10 @@ export function ReaderAuthForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const callbackUrl = normalizeDestination(searchParams.get("callbackUrl"));
   const verifiedParam = searchParams.get("verified");
+  const resetParam = searchParams.get("reset");
 
   function getFieldError(field: "email" | "name" | "password") {
     return fieldErrors[field]?.[0];
@@ -117,25 +118,27 @@ export function ReaderAuthForm() {
           ? "Bạn đã thử đăng nhập quá nhiều lần. Đợi khoảng 10 phút rồi thử lại."
           : "Email hoặc mật khẩu không đúng."
       );
+      setIsSubmitting(false);
       return;
     }
 
+    // Keep spinner until navigation unmounts this page.
     router.replace(callbackUrl);
     router.refresh();
   }
 
   function submitGoogleLogin() {
-    if (isPending) {
+    if (isSubmitting) {
       return;
     }
 
     clearMessages();
-    startTransition(() => {
-      void signIn("google", { callbackUrl }).then((result) => {
-        if (result?.error) {
-          setErrorMessage("Không thể đăng nhập bằng Google lúc này. Kiểm tra cấu hình OAuth.");
-        }
-      });
+    setIsSubmitting(true);
+    void signIn("google", { callbackUrl }).then((result) => {
+      if (result?.error) {
+        setErrorMessage("Không thể đăng nhập bằng Google lúc này. Kiểm tra cấu hình OAuth.");
+        setIsSubmitting(false);
+      }
     });
   }
 
@@ -165,17 +168,27 @@ export function ReaderAuthForm() {
     );
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isPending) {
+    if (isSubmitting) {
       return;
     }
 
     clearMessages();
-    startTransition(() => {
-      void (mode === "login" ? submitLogin() : submitRegister());
-    });
+    setIsSubmitting(true);
+
+    try {
+      if (mode === "login") {
+        await submitLogin();
+      } else {
+        await submitRegister();
+        setIsSubmitting(false);
+      }
+    } catch {
+      setErrorMessage("Có lỗi xảy ra. Thử lại sau.");
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -203,12 +216,17 @@ export function ReaderAuthForm() {
               Link xác thực không hợp lệ hoặc đã hết hạn. Đăng nhập rồi bấm Gửi lại email.
             </p>
           ) : null}
+          {resetParam === "1" ? (
+            <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+              Mật khẩu đã được cập nhật. Bạn có thể đăng nhập.
+            </p>
+          ) : null}
           {mode === "register" ? (
             <div className="space-y-2">
               <Label htmlFor="reader-name">Tên hiển thị</Label>
               <Input
                 aria-invalid={Boolean(getFieldError("name"))}
-                disabled={isPending}
+                disabled={isSubmitting}
                 id="reader-name"
                 onChange={(event) => {
                   setFormValues((currentValues) => ({
@@ -228,7 +246,7 @@ export function ReaderAuthForm() {
             <Input
               aria-invalid={Boolean(getFieldError("email"))}
               autoComplete="email"
-              disabled={isPending}
+              disabled={isSubmitting}
               id="reader-email"
               onChange={(event) => {
                 setFormValues((currentValues) => ({
@@ -244,13 +262,23 @@ export function ReaderAuthForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reader-password">Mật khẩu</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="reader-password">Mật khẩu</Label>
+              {mode === "login" ? (
+                <Link
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  href="/forgot-password"
+                >
+                  Quên mật khẩu?
+                </Link>
+              ) : null}
+            </div>
             <div className="relative">
               <Input
                 aria-invalid={Boolean(getFieldError("password"))}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 className="pr-11"
-                disabled={isPending}
+                disabled={isSubmitting}
                 id="reader-password"
                 onChange={(event) => {
                   setFormValues((currentValues) => ({
@@ -292,8 +320,8 @@ export function ReaderAuthForm() {
             </div>
           ) : null}
 
-          <Button className="w-full" disabled={isPending} size="lg" type="submit">
-            {isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
+          <Button className="w-full" disabled={isSubmitting} size="lg" type="submit">
+            {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null}
             {mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}
           </Button>
 
@@ -305,13 +333,13 @@ export function ReaderAuthForm() {
 
           <Button
             className="w-full"
-            disabled={isPending}
+            disabled={isSubmitting}
             onClick={submitGoogleLogin}
             size="lg"
             type="button"
             variant="outline"
           >
-            {isPending ? (
+            {isSubmitting ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
               <GoogleMark className="size-4" />
@@ -322,7 +350,7 @@ export function ReaderAuthForm() {
       </CardContent>
       <CardFooter className="flex flex-col justify-center gap-2 border-t pt-5 sm:flex-row">
         <Button
-          disabled={isPending}
+          disabled={isSubmitting}
           onClick={() => {
             setMode((currentMode) => (currentMode === "login" ? "register" : "login"));
             clearMessages();

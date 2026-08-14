@@ -1,42 +1,76 @@
-const COMMENT_WINDOW_MS = 60_000;
-const COMMENT_MAX_ATTEMPTS = 5;
+import { getClientIpAddress, type RequestLike } from "@/lib/auth/request-ip";
+import { getRedis } from "@/lib/redis/client";
 
-type RateLimitBucket = {
-  count: number;
-  resetAt: number;
+const WINDOW_SEC = 60;
+const MAX_ATTEMPTS = 5;
+
+type RateLimitHit = {
+  retryAfterSeconds: number;
 };
 
-const buckets = new Map<string, RateLimitBucket>();
+const globalMemory = globalThis as typeof globalThis & {
+  __nhamCommentRateLimitMemory?: Map<string, { count: number; windowStartedAt: number }>;
+};
 
-function getClientIp(request: Request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() ?? "unknown";
+function memoryStore() {
+  if (!globalMemory.__nhamCommentRateLimitMemory) {
+    globalMemory.__nhamCommentRateLimitMemory = new Map();
   }
 
-  return request.headers.get("x-real-ip") ?? "unknown";
+  return globalMemory.__nhamCommentRateLimitMemory;
 }
 
-export function assertCommentRateLimit(request: Request, userId: string) {
-  const now = Date.now();
-  const key = `${userId}:${getClientIp(request)}`;
-  const bucket = buckets.get(key);
+function bucketKey(userId: string, ip: string) {
+  return `${userId}:${ip}`;
+}
 
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, {
-      count: 1,
-      resetAt: now + COMMENT_WINDOW_MS,
-    });
-    return null;
-  }
+/** Returns a hit object when the user/IP pair is over the comment cap; otherwise null. */
+export async function assertCommentRateLimit(
+  request: RequestLike,
+  userId: string
+): Promise<RateLimitHit | null> {
+  const ip = getClientIpAddress(request);
+  const redis = await getRedis();
 
-  if (bucket.count >= COMMENT_MAX_ATTEMPTS) {
+  if (redis) {
+    const key = `comment:rate:${userId}:${ip}`;
+    const count = await redis.incr(key);
+
+    if (count === 1) {
+      await redis.expire(key, WINDOW_SEC);
+    }
+
+    if (count <= MAX_ATTEMPTS) {
+      return null;
+    }
+
+    const ttl = await redis.ttl(key);
+
     return {
-      retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+      retryAfterSeconds: Math.max(1, ttl > 0 ? ttl : WINDOW_SEC),
     };
   }
 
-  bucket.count += 1;
+  const now = Date.now();
+  const store = memoryStore();
+  const key = bucketKey(userId, ip);
+  const existing = store.get(key);
+
+  if (!existing || now - existing.windowStartedAt > WINDOW_SEC * 1000) {
+    store.set(key, { count: 1, windowStartedAt: now });
+    return null;
+  }
+
+  if (existing.count >= MAX_ATTEMPTS) {
+    return {
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((existing.windowStartedAt + WINDOW_SEC * 1000 - now) / 1000)
+      ),
+    };
+  }
+
+  existing.count += 1;
+  store.set(key, existing);
   return null;
 }

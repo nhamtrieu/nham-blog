@@ -13,6 +13,10 @@ export {
   emailVerificationService,
   createEmailVerificationService,
 } from "@/services/email-verification.service";
+export {
+  passwordResetService,
+  createPasswordResetService,
+} from "@/services/password-reset.service";
 export { ServiceError, SERVICE_ERROR_CODES, isServiceError } from "@/services/service-error";
 export { tagService, createTagService } from "@/services/tag.service";
 export { userService, createUserService } from "@/services/user.service";

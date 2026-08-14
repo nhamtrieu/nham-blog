@@ -22,6 +22,7 @@ type ApiErrorResponse = {
 };
 
 type SignedUploadPayloadResponse = {
+  allowedFormats?: string;
   apiKey: string;
   folder: string;
   signature: string;
@@ -48,6 +49,8 @@ const LINK_FIELDS = [
 ] as const;
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const AVATAR_ACCEPT = "image/jpeg,image/png,.jpg,.jpeg,.png";
+const AVATAR_ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 async function parseJsonResponse<T>(response: Response): Promise<T | null> {
   const rawBody = await response.text();
@@ -158,8 +161,8 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Chỉ hỗ trợ file ảnh.");
+    if (!AVATAR_ALLOWED_MIME_TYPES.has(file.type)) {
+      toast.error("Chỉ hỗ trợ JPG hoặc PNG.");
       return;
     }
 
@@ -189,6 +192,9 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
       cloudinaryPayload.set("folder", signResponseBody.folder);
       cloudinaryPayload.set("timestamp", String(signResponseBody.timestamp));
       cloudinaryPayload.set("signature", signResponseBody.signature);
+      if (signResponseBody.allowedFormats) {
+        cloudinaryPayload.set("allowed_formats", signResponseBody.allowedFormats);
+      }
 
       const cloudinaryResponse = await fetch(signResponseBody.uploadUrl, {
         method: "POST",
@@ -299,7 +305,7 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
               </div>
             </div>
             <input
-              accept="image/*"
+              accept={AVATAR_ACCEPT}
               className="hidden"
               onChange={handleAvatarChange}
               ref={fileInputRef}

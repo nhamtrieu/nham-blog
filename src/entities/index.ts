@@ -4,6 +4,7 @@ import { Comment } from "@/entities/comment.entity";
 import { EmailVerificationToken } from "@/entities/email-verification-token.entity";
 import { MediaAsset } from "@/entities/media-asset.entity";
 import { Notification } from "@/entities/notification.entity";
+import { PasswordResetToken } from "@/entities/password-reset-token.entity";
 import { Post } from "@/entities/post.entity";
 import { PostLike } from "@/entities/post-like.entity";
 import { PostSave } from "@/entities/post-save.entity";
@@ -16,6 +17,7 @@ type EntityClass = abstract new (...args: never[]) => object;
 export const appEntities: Array<EntityClass | EntitySchema> = [
   User,
   EmailVerificationToken,
+  PasswordResetToken,
   Post,
   Comment,
   Notification,
@@ -31,6 +33,7 @@ export {
   EmailVerificationToken,
   MediaAsset,
   Notification,
+  PasswordResetToken,
   Post,
   PostLike,
   PostSave,

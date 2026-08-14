@@ -8,5 +8,5 @@ type AuthSessionProviderProps = {
 };
 
 export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
-  return <SessionProvider refetchInterval={30}>{children}</SessionProvider>;
+  return <SessionProvider>{children}</SessionProvider>;
 }

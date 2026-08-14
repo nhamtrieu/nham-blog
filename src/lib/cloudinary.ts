@@ -4,6 +4,7 @@ import { env } from "@/env";
 
 export const CLOUDINARY_UPLOAD_FOLDER = "nham-blog/admin";
 export const CLOUDINARY_AVATAR_FOLDER = "nham-blog/avatars";
+export const CLOUDINARY_AVATAR_ALLOWED_FORMATS = "jpg,png";
 export const CLOUDINARY_UPLOAD_RESOURCE_TYPE = "image";
 
 type CloudinaryConfig = {
@@ -13,6 +14,7 @@ type CloudinaryConfig = {
 };
 
 export type SignedUploadPayload = {
+  allowedFormats?: string;
   apiKey: string;
   cloudName: string;
   folder: string;
@@ -44,6 +46,7 @@ export function isCloudinaryConfigured() {
 
 export function createSignedUploadPayload(
   options: {
+    allowedFormats?: string;
     folder?: string;
     timestamp?: number;
   } = {}
@@ -56,13 +59,16 @@ export function createSignedUploadPayload(
 
   const folder = options.folder ?? CLOUDINARY_UPLOAD_FOLDER;
   const timestamp = options.timestamp ?? Math.floor(Date.now() / 1000);
-  const signature = cloudinary.utils.api_sign_request(
-    {
-      folder,
-      timestamp: String(timestamp),
-    },
-    config.apiSecret
-  );
+  const params: Record<string, string> = {
+    folder,
+    timestamp: String(timestamp),
+  };
+
+  if (options.allowedFormats) {
+    params.allowed_formats = options.allowedFormats;
+  }
+
+  const signature = cloudinary.utils.api_sign_request(params, config.apiSecret);
 
   return {
     apiKey: config.apiKey,
@@ -72,5 +78,6 @@ export function createSignedUploadPayload(
     signature,
     timestamp,
     uploadUrl: `https://api.cloudinary.com/v1_1/${config.cloudName}/${CLOUDINARY_UPLOAD_RESOURCE_TYPE}/upload`,
+    ...(options.allowedFormats ? { allowedFormats: options.allowedFormats } : {}),
   };
 }
