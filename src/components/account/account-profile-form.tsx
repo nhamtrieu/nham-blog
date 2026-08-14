@@ -103,6 +103,43 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
+  async function persistProfile(nextAvatarUrl: string) {
+    const response = await fetch("/api/account", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+        jobTitle,
+        bio,
+        avatarUrl: nextAvatarUrl,
+        links,
+      }),
+    });
+    const responseBody = await parseJsonResponse<
+      ApiErrorResponse & { profile?: AccountProfile }
+    >(response);
+
+    if (!response.ok) {
+      setFieldErrors(responseBody?.fields ?? {});
+      throw new Error(responseBody?.message ?? "Không thể lưu hồ sơ lúc này.");
+    }
+
+    const profile = responseBody?.profile;
+    if (profile) {
+      setAvatarUrl(profile.avatarUrl ?? "");
+      await update({
+        name: profile.name,
+        avatarUrl: profile.avatarUrl,
+      });
+      router.refresh();
+    }
+
+    return profile;
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -114,40 +151,10 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
     setFieldErrors({});
 
     try {
-      const response = await fetch("/api/account", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          jobTitle,
-          bio,
-          avatarUrl,
-          links,
-        }),
-      });
-      const responseBody = await parseJsonResponse<
-        ApiErrorResponse & { profile?: AccountProfile }
-      >(response);
-
-      if (!response.ok) {
-        setFieldErrors(responseBody?.fields ?? {});
-        toast.error(responseBody?.message ?? "Không thể lưu hồ sơ lúc này.");
-        return;
-      }
-
-      const profile = responseBody?.profile;
-      if (profile) {
-        await update({
-          name: profile.name,
-          avatarUrl: profile.avatarUrl,
-        });
-        router.refresh();
-      }
-
+      await persistProfile(avatarUrl);
       toast.success("Đã lưu thay đổi.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể lưu hồ sơ lúc này.");
     } finally {
       setIsSaving(false);
     }
@@ -172,6 +179,7 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
     }
 
     setIsUploadingAvatar(true);
+    setFieldErrors({});
 
     try {
       const signResponse = await fetch("/api/account/avatar/sign", {
@@ -203,7 +211,7 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
       const cloudinaryResponseBody =
         await parseJsonResponse<CloudinaryUploadResponse>(cloudinaryResponse);
 
-      if (!cloudinaryResponse.ok) {
+      if (!cloudinaryResponse.ok || cloudinaryResponseBody?.error) {
         toast.error(
           cloudinaryResponseBody?.error?.message ?? "Cloudinary từ chối upload."
         );
@@ -219,7 +227,33 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
       }
 
       setAvatarUrl(uploadedUrl);
-      toast.success("Đã chọn ảnh mới. Nhấn Lưu thay đổi để áp dụng.");
+      await persistProfile(uploadedUrl);
+      toast.success("Đã cập nhật ảnh đại diện.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể lưu ảnh đại diện lúc này."
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    if (isSaving || isUploadingAvatar || !avatarUrl) {
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setFieldErrors({});
+
+    try {
+      setAvatarUrl("");
+      await persistProfile("");
+      toast.success("Đã xóa ảnh đại diện.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể xóa ảnh đại diện lúc này."
+      );
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -293,7 +327,7 @@ export function AccountProfileForm({ initialProfile }: AccountProfileFormProps) 
                   <Button
                     disabled={isBusy}
                     onClick={() => {
-                      setAvatarUrl("");
+                      void handleRemoveAvatar();
                     }}
                     size="sm"
                     type="button"
