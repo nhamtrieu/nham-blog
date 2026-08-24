@@ -82,6 +82,7 @@ type PostEditorFormValues = {
   seoTitle: string;
   seoDescription: string;
   tagIds: string[];
+  sendNewsletter: boolean;
 };
 
 type ApiErrorResponse = {
@@ -166,6 +167,7 @@ function createInitialFormValues(initialData?: PostEditorInitialData): PostEdito
     seoTitle: initialData?.seoTitle ?? "",
     seoDescription: initialData?.seoDescription ?? "",
     tagIds: initialData?.tagIds ?? [],
+    sendNewsletter: true,
   };
 }
 
@@ -188,6 +190,7 @@ function createSavePayload(formValues: PostEditorFormValues, omitPublishFields =
   return {
     ...payload,
     status: formValues.status,
+    sendNewsletter: formValues.sendNewsletter,
   };
 }
 
@@ -1214,6 +1217,21 @@ export function PostEditorForm({
                       {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
                       {formValues.status === PostStatus.PUBLISHED ? "Unpublish" : "Publish"}
                     </Button>
+                    {formValues.status !== PostStatus.PUBLISHED &&
+                    currentPost?.status !== PostStatus.PUBLISHED ? (
+                      <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm leading-5 text-muted-foreground">
+                        <input
+                          checked={formValues.sendNewsletter}
+                          className="mt-0.5 size-4 rounded border-input"
+                          disabled={isBusy}
+                          onChange={(event) => {
+                            updateField("sendNewsletter", event.target.checked);
+                          }}
+                          type="checkbox"
+                        />
+                        <span>Gửi newsletter khi publish (chỉ lần đầu)</span>
+                      </label>
+                    ) : null}
                   </div>
 
                   <div>

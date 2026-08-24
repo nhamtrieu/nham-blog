@@ -26,6 +26,32 @@ import type { PostCreateInput, PostUpdateInput } from "@/validators/post.validat
 
 type DataSourceFactory = typeof initializeDataSource;
 
+type NewsletterEnqueue = (postId: string) => Promise<unknown>;
+
+async function maybeEnqueueNewsletter(options: {
+  shouldSend: boolean;
+  becamePublished: boolean;
+  postId: string;
+  enqueue?: NewsletterEnqueue;
+}) {
+  if (!options.shouldSend || !options.becamePublished) {
+    return;
+  }
+
+  try {
+    const enqueue =
+      options.enqueue ??
+      (async (postId: string) => {
+        const { newsletterService } = await import("@/services/newsletter.service");
+        return newsletterService.enqueueIssueForPost(postId);
+      });
+    await enqueue(options.postId);
+  } catch (error) {
+    // Publish must succeed even if newsletter fails.
+    console.error("[newsletter] enqueue after publish failed", error);
+  }
+}
+
 async function runWithDataSource<T>(
   factory: DataSourceFactory,
   fn: (dataSource: DataSource) => Promise<T>
@@ -469,7 +495,10 @@ async function replacePostTags(manager: EntityManager, postId: string, tags: Tag
   );
 }
 
-export function createPostService(dataSourceFactory: DataSourceFactory = initializeDataSource) {
+export function createPostService(
+  dataSourceFactory: DataSourceFactory = initializeDataSource,
+  newsletterEnqueue?: NewsletterEnqueue
+) {
   return {
     async getPost(postId: string): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
@@ -817,7 +846,7 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
     async createPost({ authorId, input }: CreatePostParams): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
 
-      return dataSource.transaction(async (manager) => {
+      const saved = await dataSource.transaction(async (manager) => {
         await assertAuthorExists(manager, authorId);
 
         const tags = await loadTagsByIdsOrThrow(manager, input.tagIds);
@@ -845,14 +874,24 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
 
         return mapPostRecord(await loadPostRecordOrThrow(manager, savedPost.id));
       });
+
+      await maybeEnqueueNewsletter({
+        shouldSend: input.sendNewsletter !== false,
+        becamePublished: saved.status === PostStatus.PUBLISHED,
+        postId: saved.id,
+        enqueue: newsletterEnqueue,
+      });
+
+      return saved;
     },
 
     async updatePost({ postId, input }: UpdatePostParams): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
 
-      return dataSource.transaction(async (manager) => {
+      const { saved, becamePublished } = await dataSource.transaction(async (manager) => {
         const postRepository = manager.getRepository(Post);
         const existingPost = await loadPostRecordOrThrow(manager, postId);
+        const wasPublished = existingPost.status === PostStatus.PUBLISHED;
         const tags =
           input.tagIds === undefined
             ? null
@@ -891,8 +930,22 @@ export function createPostService(dataSourceFactory: DataSourceFactory = initial
           await replacePostTags(manager, postId, tags);
         }
 
-        return mapPostRecord(await loadPostRecordOrThrow(manager, postId));
+        const mapped = mapPostRecord(await loadPostRecordOrThrow(manager, postId));
+
+        return {
+          saved: mapped,
+          becamePublished: !wasPublished && mapped.status === PostStatus.PUBLISHED,
+        };
       });
+
+      await maybeEnqueueNewsletter({
+        shouldSend: input.sendNewsletter !== false,
+        becamePublished,
+        postId: saved.id,
+        enqueue: newsletterEnqueue,
+      });
+
+      return saved;
     },
 
     async deletePost(postId: string): Promise<void> {

@@ -5,18 +5,29 @@ import {
   closePasswordResetRabbitMq,
   consumePasswordResetEmails,
 } from "@/lib/rabbitmq/password-reset-queue";
+import {
+  closeNewsletterRabbitMq,
+  consumeNewsletterConfirms,
+  consumeNewsletterIssues,
+} from "@/lib/rabbitmq/newsletter-queue";
 import { sendPasswordResetEmail } from "@/lib/email/send-password-reset-email";
 import { sendVerificationEmail } from "@/lib/email/send-verification-email";
+import { sendNewsletterConfirmEmail } from "@/lib/email/send-newsletter-confirm-email";
+import { newsletterService } from "@/services/newsletter.service";
 import { validateEnv } from "@/env";
 
 validateEnv();
 
 async function closeAllRabbitMq() {
-  await Promise.all([closeRabbitMq(), closePasswordResetRabbitMq()]);
+  await Promise.all([
+    closeRabbitMq(),
+    closePasswordResetRabbitMq(),
+    closeNewsletterRabbitMq(),
+  ]);
 }
 
 async function main() {
-  console.log("[email-worker] started (verification + password reset)");
+  console.log("[email-worker] started (verification + password reset + newsletter)");
 
   await consumeVerificationEmails(async (message) => {
     console.log(`[email-verification] sending to ${message.email} (user ${message.userId})`);
@@ -36,6 +47,21 @@ async function main() {
       resetUrl: message.resetUrl,
     });
     console.log(`[password-reset] sent to ${message.email}`);
+  });
+
+  await consumeNewsletterConfirms(async (message) => {
+    console.log(`[newsletter.confirm] sending to ${message.email}`);
+    await sendNewsletterConfirmEmail({
+      to: message.email,
+      confirmUrl: message.confirmUrl,
+    });
+    console.log(`[newsletter.confirm] sent to ${message.email}`);
+  });
+
+  await consumeNewsletterIssues(async (message) => {
+    console.log(`[newsletter.issue] processing ${message.issueId}`);
+    await newsletterService.processIssue(message.issueId);
+    console.log(`[newsletter.issue] done ${message.issueId}`);
   });
 }
 

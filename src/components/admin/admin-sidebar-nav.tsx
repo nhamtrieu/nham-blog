@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Home, ImageIcon, MessageSquare, Tags, Users } from "lucide-react";
+import { FileText, Home, ImageIcon, Mail, MessageSquare, Tags, Users } from "lucide-react";
 
 import {
   SidebarGroup,
@@ -45,6 +45,13 @@ const adminNavItems = [
     icon: MessageSquare,
   },
   {
+    href: "/admin/newsletter/subscribers",
+    matchPrefix: "/admin/newsletter",
+    label: "Newsletter",
+    description: "Subscribers & issues",
+    icon: Mail,
+  },
+  {
     href: "/admin/users",
     label: "Users",
     description: "Chỉ định writer",
@@ -52,12 +59,14 @@ const adminNavItems = [
   },
 ] as const;
 
-function isActivePath(pathname: string, href: string) {
-  if (href === "/admin") {
+function isActivePath(pathname: string, href: string, matchPrefix?: string) {
+  const prefix = matchPrefix ?? href;
+
+  if (prefix === "/admin") {
     return pathname === href;
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
 export function AdminSidebarNav() {
@@ -69,7 +78,11 @@ export function AdminSidebarNav() {
       <SidebarGroupContent>
         <SidebarMenu>
           {adminNavItems.map((item) => {
-            const active = isActivePath(pathname, item.href);
+            const active = isActivePath(
+              pathname,
+              item.href,
+              "matchPrefix" in item ? item.matchPrefix : undefined
+            );
             const Icon = item.icon;
 
             return (

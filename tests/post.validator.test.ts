@@ -38,6 +38,7 @@ test("validatePostCreateInput normalizes optional values and defaults status", (
     seoTitle: "SEO title",
     seoDescription: "SEO description",
     tagIds: [FIRST_TAG_ID, SECOND_TAG_ID],
+    sendNewsletter: true,
   });
 });
 

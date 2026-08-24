@@ -5,6 +5,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { EmailVerificationBanner } from "@/components/public/email-verification-banner";
 import { EmailVerifiedCelebration } from "@/components/public/email-verified-celebration";
+import { PublicSiteFooter } from "@/components/newsletter/public-site-footer";
 import type { EmailVerificationSessionUser } from "@/lib/auth/email-verification";
 
 type BannerUser = EmailVerificationSessionUser & {
@@ -36,6 +37,7 @@ export function PublicSiteShell({
       </Suspense>
       {header}
       {children}
+      <PublicSiteFooter />
     </>
   );
 }

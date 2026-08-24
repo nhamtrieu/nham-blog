@@ -12,6 +12,7 @@ import { getServerAuthSession } from "@/auth";
 import { CommentSection, type PublicCommentView } from "@/components/blog/comment-section";
 import { PostEngagementBar } from "@/components/blog/post-engagement-bar";
 import { PostTableOfContents } from "@/components/blog/post-table-of-contents";
+import { NewsletterSubscribeForm } from "@/components/newsletter/newsletter-subscribe-form";
 import { loadPublishedPostBySlug } from "@/app/blog/[slug]/load-published-post";
 import { env } from "@/env";
 import { absoluteUrl } from "@/lib/absolute-url";
@@ -453,6 +454,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           ) : null}
 
           <div className="mt-8 border-t border-border pt-6">{content}</div>
+
+          <section className="mt-10 rounded-2xl border border-border bg-muted/20 p-5 sm:p-6">
+            <NewsletterSubscribeForm source="post" />
+          </section>
 
           <CommentSection
             currentUser={

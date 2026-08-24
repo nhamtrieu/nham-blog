@@ -3,7 +3,7 @@ export const siteConfig = {
   title: "Nham Blog",
   heading: "Viết về engineering một cách rõ ràng.",
   description:
-    "Nhật ký kỹ thuật, pattern thực dụng và những ghi chú mình muốn giữ lại khi làm sản phẩm.",
+    "Nhật ký kỹ thuật, pattern thực dụng và những ghi chú mình muốn giữ lại khi làm sản phẩm và cuộc sống.",
   locale: "vi",
 } as const;
 

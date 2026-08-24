@@ -43,6 +43,14 @@ The generator is initialized and configured through [components.json](/home/nham
 - Seed admin user and starter tags: `yarn seed`
 - Reset the admin password from env vars: `yarn admin:reset-password`
 
+## Newsletter
+
+- Public subscribe form (footer + post page); double opt-in via email.
+- Admin: `/admin/newsletter/subscribers`, `/admin/newsletter/issues`.
+- First publish of a post can enqueue one newsletter issue (checkbox default on).
+- Uses `RESEND_API_KEY` + `EMAIL_FROM` (optional `NEWSLETTER_FROM`). Without `RABBITMQ_URL`, email sends inline; with queue run `yarn worker:email`.
+- Plan: [docs/NEWSLETTER_IMPLEMENTATION_PLAN.md](./docs/NEWSLETTER_IMPLEMENTATION_PLAN.md). Ops checklist: [docs/NEWSLETTER_OPS.md](./docs/NEWSLETTER_OPS.md).
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

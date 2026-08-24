@@ -20,11 +20,10 @@ export function HomeHeroBanner() {
             {siteConfig.name}
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            Viết về engineering
-            <span className="block text-foreground/80">một cách rõ ràng</span>
+            Viết về engineering một cách rõ ràng
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-            Nhật ký kỹ thuật, pattern thực dụng và những ghi chú mình muốn giữ lại khi làm sản phẩm.
+            {siteConfig.description}
           </p>
           <ul className="mt-6 space-y-2.5">
             {HERO_POINTS.map((point) => (

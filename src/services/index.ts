@@ -2,6 +2,7 @@ export { accountProfileService, createAccountProfileService } from "@/services/a
 export { authorService, createAuthorService } from "@/services/author.service";
 export { commentService, createCommentService } from "@/services/comment.service";
 export { mediaService, createMediaService } from "@/services/media.service";
+export { newsletterService, createNewsletterService } from "@/services/newsletter.service";
 export { notificationService, createNotificationService } from "@/services/notification.service";
 export { postService, createPostService } from "@/services/post.service";
 export {

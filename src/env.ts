@@ -44,6 +44,8 @@ const envSchema = z.object({
   ),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   EMAIL_FROM: z.string().trim().min(1).optional(),
+  /** Optional override for newsletter From; falls back to EMAIL_FROM. */
+  NEWSLETTER_FROM: z.string().trim().min(1).optional(),
 });
 
 function formatEnvErrors(error: z.ZodError) {
@@ -90,6 +92,7 @@ function parseEnv() {
     RABBITMQ_URL: process.env.RABBITMQ_URL,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
+    NEWSLETTER_FROM: process.env.NEWSLETTER_FROM,
   });
 
   if (!parsed.success) {

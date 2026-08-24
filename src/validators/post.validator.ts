@@ -123,6 +123,8 @@ const publishedAtFieldSchema = z.preprocess(
 
 const statusFieldSchema = z.nativeEnum(PostStatus).optional();
 
+const sendNewsletterFieldSchema = z.boolean().optional();
+
 const tagIdsFieldSchema = z
   .array(z.uuid("Each tag ID must be a valid UUID."))
   .refine((tagIds) => new Set(tagIds).size === tagIds.length, "Tag IDs must be unique.");
@@ -141,6 +143,7 @@ const postBaseShape = {
   seoTitle: seoTitleFieldSchema,
   seoDescription: seoDescriptionFieldSchema,
   tagIds: createTagIdsFieldSchema,
+  sendNewsletter: sendNewsletterFieldSchema,
 } satisfies Record<string, z.ZodTypeAny>;
 
 export const postCreateSchema = z
@@ -148,6 +151,7 @@ export const postCreateSchema = z
   .transform((data) => ({
     ...data,
     status: data.status ?? PostStatus.DRAFT,
+    sendNewsletter: data.sendNewsletter ?? true,
   }))
   .superRefine((data, context) => {
     if (data.status === PostStatus.DRAFT && data.publishedAt) {
@@ -171,6 +175,7 @@ export const postUpdateSchema = z
     seoTitle: seoTitleFieldSchema,
     seoDescription: seoDescriptionFieldSchema,
     tagIds: updateTagIdsFieldSchema,
+    sendNewsletter: sendNewsletterFieldSchema,
   })
   .superRefine((data, context) => {
     const hasAtLeastOneField = Object.values(data).some((value) => value !== undefined);
