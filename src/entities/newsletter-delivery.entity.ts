@@ -69,7 +69,7 @@ export class NewsletterDelivery {
   })
   sentAt!: Date | null;
 
-  @ManyToOne(() => NewsletterIssue, (issue) => issue.deliveries, {
+  @ManyToOne(() => NewsletterIssue, {
     nullable: false,
     onDelete: "CASCADE",
   })

@@ -4,15 +4,12 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
 import type { Relation } from "typeorm";
 
-import { NewsletterDelivery } from "@/entities/newsletter-delivery.entity";
 import { Post } from "@/entities/post.entity";
-import type { NewsletterDelivery as NewsletterDeliveryEntity } from "@/entities/newsletter-delivery.entity";
 import type { Post as PostEntity } from "@/entities/post.entity";
 
 export enum NewsletterIssueStatus {
@@ -97,8 +94,8 @@ export class NewsletterIssue {
   @JoinColumn({ name: "post_id" })
   post!: Relation<PostEntity>;
 
-  @OneToMany(() => NewsletterDelivery, (delivery) => delivery.issue)
-  deliveries!: Relation<NewsletterDeliveryEntity[]>;
+  // ponytail: no OneToMany→NewsletterDelivery — that circular import blows up Next
+  // production minify (TDZ on NewsletterIssue). Query deliveries via repository instead.
 
   @CreateDateColumn({
     name: "created_at",
