@@ -83,7 +83,13 @@ export default async function WritePostsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={post.status === PostStatus.PUBLISHED ? "default" : "secondary"}
+                        variant={
+                          post.status === PostStatus.PUBLISHED
+                            ? "default"
+                            : post.status === PostStatus.SCHEDULED
+                              ? "outline"
+                              : "secondary"
+                        }
                       >
                         {post.status}
                       </Badge>

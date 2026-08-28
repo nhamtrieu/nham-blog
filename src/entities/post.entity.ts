@@ -19,6 +19,7 @@ import type { User as UserEntity } from "@/entities/user.entity";
 
 export enum PostStatus {
   DRAFT = "DRAFT",
+  SCHEDULED = "SCHEDULED",
   PUBLISHED = "PUBLISHED",
 }
 
@@ -96,6 +97,13 @@ export class Post {
     nullable: true,
   })
   seoDescription!: string | null;
+
+  @Column({
+    type: "float8",
+    array: true,
+    nullable: true,
+  })
+  embedding!: number[] | null;
 
   @Column({
     name: "author_id",

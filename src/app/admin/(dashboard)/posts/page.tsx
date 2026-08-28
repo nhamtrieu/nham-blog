@@ -28,11 +28,16 @@ type AdminPostsPageProps = {
 const statusOptions = [
   { label: "Tat ca trang thai", value: "ALL" },
   { label: "Draft", value: PostStatus.DRAFT },
+  { label: "Scheduled", value: PostStatus.SCHEDULED },
   { label: "Published", value: PostStatus.PUBLISHED },
 ] as const;
 
 function parseStatusFilter(value: string | undefined) {
-  if (value === PostStatus.DRAFT || value === PostStatus.PUBLISHED) {
+  if (
+    value === PostStatus.DRAFT ||
+    value === PostStatus.SCHEDULED ||
+    value === PostStatus.PUBLISHED
+  ) {
     return value;
   }
 
@@ -92,7 +97,7 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:gap-5">
         <Card className="gap-0 py-0 shadow-sm">
           <CardHeader className="space-y-2 px-6 pt-6 pb-3">
             <CardDescription className="text-xs font-medium uppercase tracking-wider">
@@ -111,6 +116,15 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
           </CardHeader>
           <CardContent className="px-6 pb-6 pt-0">
             <p className="text-sm text-muted-foreground leading-relaxed">Bài đang trong quá trình biên tập.</p>
+          </CardContent>
+        </Card>
+        <Card className="gap-0 py-0 shadow-sm">
+          <CardHeader className="space-y-2 px-6 pt-6 pb-3">
+            <CardDescription className="text-xs font-medium uppercase tracking-wider">Scheduled</CardDescription>
+            <CardTitle className="text-3xl tabular-nums">{posts.statusCounts.scheduled}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-6 pb-6 pt-0">
+            <p className="text-sm text-muted-foreground leading-relaxed">Bài đã lên lịch, chưa tới giờ công khai.</p>
           </CardContent>
         </Card>
         <Card className="gap-0 py-0 shadow-sm">
@@ -237,7 +251,9 @@ export default async function AdminPostsPage({ searchParams }: AdminPostsPagePro
                           className={
                             post.status === PostStatus.PUBLISHED
                               ? "border-emerald-500/25 bg-emerald-500/15 px-2.5 py-1 text-emerald-100"
-                              : "border-amber-500/25 bg-amber-500/15 px-2.5 py-1 text-amber-100"
+                              : post.status === PostStatus.SCHEDULED
+                                ? "border-sky-500/25 bg-sky-500/15 px-2.5 py-1 text-sky-100"
+                                : "border-amber-500/25 bg-amber-500/15 px-2.5 py-1 text-amber-100"
                           }
                           variant="outline"
                         >

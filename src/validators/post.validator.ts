@@ -132,6 +132,27 @@ const tagIdsFieldSchema = z
 const createTagIdsFieldSchema = tagIdsFieldSchema.default([]);
 const updateTagIdsFieldSchema = tagIdsFieldSchema.optional();
 
+function refinePublicationRules(
+  data: { status?: PostStatus; publishedAt?: Date | null },
+  context: z.RefinementCtx
+) {
+  if (data.status === PostStatus.DRAFT && data.publishedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["publishedAt"],
+      message: "Draft posts cannot define a published date.",
+    });
+  }
+
+  if (data.status === PostStatus.SCHEDULED && !data.publishedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["publishedAt"],
+      message: "Scheduled posts require a publish date.",
+    });
+  }
+}
+
 const postBaseShape = {
   title: titleFieldSchema,
   slug: slugFieldSchema,
@@ -153,15 +174,7 @@ export const postCreateSchema = z
     status: data.status ?? PostStatus.DRAFT,
     sendNewsletter: data.sendNewsletter ?? true,
   }))
-  .superRefine((data, context) => {
-    if (data.status === PostStatus.DRAFT && data.publishedAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["publishedAt"],
-        message: "Draft posts cannot define a published date.",
-      });
-    }
-  });
+  .superRefine(refinePublicationRules);
 
 export const postUpdateSchema = z
   .object({
@@ -187,13 +200,7 @@ export const postUpdateSchema = z
       });
     }
 
-    if (data.status === PostStatus.DRAFT && data.publishedAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["publishedAt"],
-        message: "Draft posts cannot define a published date.",
-      });
-    }
+    refinePublicationRules(data, context);
   });
 
 export type PostCreateInput = z.infer<typeof postCreateSchema>;

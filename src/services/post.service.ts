@@ -3,10 +3,8 @@ import {
   Equal,
   ILike,
   In,
-  IsNull,
   LessThan,
   Like,
-  Not,
   type DataSource,
   type EntityManager,
 } from "typeorm";
@@ -16,7 +14,15 @@ import { Post, PostStatus } from "@/entities/post.entity";
 import { PostTag } from "@/entities/post-tag.entity";
 import { Tag } from "@/entities/tag.entity";
 import { User } from "@/entities/user.entity";
-import { calculateReadingTimeFromMdx } from "@/lib/reading-time";
+import { buildPostEmbeddingInput, embedText } from "@/lib/embedding";
+import {
+  applyPublicVisibilityToQueryBuilder,
+  pickRelatedPostIds,
+  publicVisibilityWhere,
+  resolveCreatePublicationState,
+  resolveUpdatePublicationState,
+} from "@/lib/post-publication";
+import { calculateReadingTimeFromMdx, extractReadableTextFromMdx } from "@/lib/reading-time";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import {
   SERVICE_ERROR_CODES,
@@ -115,6 +121,7 @@ export type PostListResult = {
   totalCount: number;
   statusCounts: {
     draft: number;
+    scheduled: number;
     published: number;
   };
   appliedFilters: {
@@ -178,6 +185,41 @@ const DEFAULT_PUBLISHED_POST_PAGE_SIZE = 6;
 const MAX_PUBLISHED_POST_PAGE_SIZE = 24;
 const DEFAULT_RSS_ITEM_LIMIT = 30;
 const MAX_RSS_ITEM_LIMIT = 100;
+const DEFAULT_RELATED_POST_LIMIT = 3;
+const MAX_RELATED_POST_LIMIT = 6;
+/** ponytail: in-memory related ranking; ceiling ~small blog. Upgrade: pgvector ANN. */
+const RELATED_CANDIDATE_POOL_SIZE = 100;
+
+function isPublicFacingStatus(status: PostStatus) {
+  return status === PostStatus.PUBLISHED || status === PostStatus.SCHEDULED;
+}
+
+async function persistPostEmbedding(
+  factory: DataSourceFactory,
+  post: Pick<Post, "id" | "title" | "excerpt" | "contentMdx" | "status">
+) {
+  if (!isPublicFacingStatus(post.status)) {
+    return false;
+  }
+
+  const embedding = await embedText(
+    buildPostEmbeddingInput({
+      title: post.title,
+      excerpt: post.excerpt,
+      contentText: extractReadableTextFromMdx(post.contentMdx),
+    })
+  );
+
+  if (!embedding) {
+    return false;
+  }
+
+  await runWithDataSource(factory, async (dataSource) => {
+    await dataSource.getRepository(Post).update({ id: post.id }, { embedding });
+  });
+
+  return true;
+}
 
 function mapTagSummary(tag: Tag): PostTagSummary {
   return {
@@ -318,42 +360,18 @@ function createPublishedPostsCursor(post: Pick<Post, "id" | "publishedAt">) {
   return `${post.publishedAt.toISOString()}::${post.id}`;
 }
 
-function resolveCreatePublicationState(status: PostStatus, publishedAt?: Date | null) {
-  if (status === PostStatus.PUBLISHED) {
-    return {
-      status,
-      publishedAt: publishedAt ?? new Date(),
-    };
+function normalizeRelatedPostsLimit(limit: number | undefined) {
+  if (!limit || !Number.isFinite(limit)) {
+    return DEFAULT_RELATED_POST_LIMIT;
   }
 
-  return {
-    status: PostStatus.DRAFT,
-    publishedAt: null,
-  };
-}
+  const normalizedLimit = Math.floor(limit);
 
-function resolveUpdatePublicationState(post: Post, input: PostUpdateInput) {
-  const targetStatus = input.status ?? post.status;
-  const hasPublishedAtUpdate = Object.prototype.hasOwnProperty.call(input, "publishedAt");
-
-  if (targetStatus === PostStatus.DRAFT) {
-    return {
-      status: PostStatus.DRAFT,
-      publishedAt: null,
-    };
+  if (normalizedLimit <= 0) {
+    return DEFAULT_RELATED_POST_LIMIT;
   }
 
-  if (hasPublishedAtUpdate) {
-    return {
-      status: PostStatus.PUBLISHED,
-      publishedAt: input.publishedAt ?? post.publishedAt ?? new Date(),
-    };
-  }
-
-  return {
-    status: PostStatus.PUBLISHED,
-    publishedAt: post.publishedAt ?? new Date(),
-  };
+  return Math.min(normalizedLimit, MAX_RELATED_POST_LIMIT);
 }
 
 async function loadPostRecordOrThrow(manager: EntityManager, postId: string) {
@@ -384,8 +402,7 @@ async function loadPublishedPostRecordBySlugOrThrow(manager: EntityManager, slug
   const post = await postRepository.findOne({
     where: {
       slug,
-      status: PostStatus.PUBLISHED,
-      publishedAt: Not(IsNull()),
+      ...publicVisibilityWhere(),
     },
     relations: {
       author: true,
@@ -563,38 +580,45 @@ export function createPostService(
       };
       const authorScope = authorId ? { authorId } : {};
 
-      const [posts, filteredCount, totalCount, draftCount, publishedCount] = await Promise.all([
-        postRepository.find({
-          where,
-          order: {
-            updatedAt: "DESC",
-            createdAt: "DESC",
-          },
-          relations: {
-            postTags: {
-              tag: true,
+      const [posts, filteredCount, totalCount, draftCount, scheduledCount, publishedCount] =
+        await Promise.all([
+          postRepository.find({
+            where,
+            order: {
+              updatedAt: "DESC",
+              createdAt: "DESC",
             },
-          },
-        }),
-        postRepository.count({
-          where,
-        }),
-        postRepository.count({
-          where: authorScope,
-        }),
-        postRepository.count({
-          where: {
-            status: PostStatus.DRAFT,
-            ...authorScope,
-          },
-        }),
-        postRepository.count({
-          where: {
-            status: PostStatus.PUBLISHED,
-            ...authorScope,
-          },
-        }),
-      ]);
+            relations: {
+              postTags: {
+                tag: true,
+              },
+            },
+          }),
+          postRepository.count({
+            where,
+          }),
+          postRepository.count({
+            where: authorScope,
+          }),
+          postRepository.count({
+            where: {
+              status: PostStatus.DRAFT,
+              ...authorScope,
+            },
+          }),
+          postRepository.count({
+            where: {
+              status: PostStatus.SCHEDULED,
+              ...authorScope,
+            },
+          }),
+          postRepository.count({
+            where: {
+              status: PostStatus.PUBLISHED,
+              ...authorScope,
+            },
+          }),
+        ]);
 
       return {
         items: posts.map(mapPostListItem),
@@ -602,6 +626,7 @@ export function createPostService(
         totalCount,
         statusCounts: {
           draft: draftCount,
+          scheduled: scheduledCount,
           published: publishedCount,
         },
         appliedFilters: {
@@ -626,16 +651,17 @@ export function createPostService(
           title: ILike(`%${normalizedSearch}%`),
         }
         : {};
+      const visibility = publicVisibilityWhere();
       const where = cursor
         ? [
           {
-            status: PostStatus.PUBLISHED,
+            ...visibility,
             publishedAt: LessThan(cursor.publishedAt),
             ...searchFilter,
             ...authorFilter,
           },
           {
-            status: PostStatus.PUBLISHED,
+            ...visibility,
             publishedAt: Equal(cursor.publishedAt),
             id: LessThan(cursor.id),
             ...searchFilter,
@@ -643,8 +669,7 @@ export function createPostService(
           },
         ]
         : {
-          status: PostStatus.PUBLISHED,
-          publishedAt: Not(IsNull()),
+          ...visibility,
           ...searchFilter,
           ...authorFilter,
         };
@@ -677,7 +702,7 @@ export function createPostService(
       const posts = await postRepository.find({
         where: {
           id: In(pagePostIds),
-          status: PostStatus.PUBLISHED,
+          ...visibility,
         },
         relations: {
           postTags: {
@@ -710,13 +735,15 @@ export function createPostService(
       const postRepository = dataSource.getRepository(Post);
       const normalizedLimit = normalizePublishedPostsPageSize(params.limit);
       const cursor = parsePublishedPostsCursor(params.cursor?.trim());
+      const visibility = publicVisibilityWhere();
 
-      const query = postRepository
-        .createQueryBuilder("post")
-        .innerJoin("post.postTags", "postTag")
-        .where("postTag.tagId = :tagId", { tagId: params.tagId })
-        .andWhere("post.status = :status", { status: PostStatus.PUBLISHED })
-        .andWhere("post.publishedAt IS NOT NULL");
+      const query = applyPublicVisibilityToQueryBuilder(
+        postRepository
+          .createQueryBuilder("post")
+          .innerJoin("post.postTags", "postTag")
+          .where("postTag.tagId = :tagId", { tagId: params.tagId }),
+        "post"
+      );
 
       if (params.authorId?.trim()) {
         query.andWhere("post.authorId = :authorId", { authorId: params.authorId.trim() });
@@ -762,7 +789,7 @@ export function createPostService(
       const posts = await postRepository.find({
         where: {
           id: In(pagePostIds),
-          status: PostStatus.PUBLISHED,
+          ...visibility,
         },
         relations: {
           postTags: {
@@ -792,10 +819,7 @@ export function createPostService(
       const dataSource = await dataSourceFactory();
       const postRepository = dataSource.getRepository(Post);
       const posts = await postRepository.find({
-        where: {
-          status: PostStatus.PUBLISHED,
-          publishedAt: Not(IsNull()),
-        },
+        where: publicVisibilityWhere(),
         select: {
           slug: true,
           updatedAt: true,
@@ -816,10 +840,7 @@ export function createPostService(
       const postRepository = dataSource.getRepository(Post);
       const take = normalizeRssItemLimit(options.limit);
       const posts = await postRepository.find({
-        where: {
-          status: PostStatus.PUBLISHED,
-          publishedAt: Not(IsNull()),
-        },
+        where: publicVisibilityWhere(),
         select: {
           title: true,
           slug: true,
@@ -843,10 +864,82 @@ export function createPostService(
       }));
     },
 
+    async listRelatedPosts(params: {
+      postId: string;
+      limit?: number;
+    }): Promise<PostListItem[]> {
+      const normalizedLimit = normalizeRelatedPostsLimit(params.limit);
+
+      return runWithDataSource(dataSourceFactory, async (dataSource) => {
+        const postRepository = dataSource.getRepository(Post);
+        const sourcePost = await postRepository.findOne({
+          where: { id: params.postId },
+          relations: {
+            postTags: true,
+          },
+        });
+
+        if (!sourcePost) {
+          throw new ServiceError({
+            code: SERVICE_ERROR_CODES.NOT_FOUND,
+            message: "Post not found.",
+            statusCode: 404,
+          });
+        }
+
+        const candidates = await postRepository.find({
+          where: publicVisibilityWhere(),
+          relations: {
+            postTags: {
+              tag: true,
+            },
+          },
+          order: {
+            publishedAt: "DESC",
+            id: "DESC",
+          },
+          take: RELATED_CANDIDATE_POOL_SIZE,
+        });
+
+        const relatedIds = pickRelatedPostIds({
+          candidates: candidates.map((post) => ({
+            id: post.id,
+            tagIds: (post.postTags ?? []).map((postTag) => postTag.tagId),
+            publishedAt: post.publishedAt as Date,
+            embedding: post.embedding,
+          })),
+          sourceTagIds: (sourcePost.postTags ?? []).map((postTag) => postTag.tagId),
+          sourceEmbedding: sourcePost.embedding,
+          excludeId: sourcePost.id,
+          limit: normalizedLimit,
+        });
+
+        const postById = new Map(candidates.map((post) => [post.id, post]));
+
+        return relatedIds
+          .map((postId) => postById.get(postId))
+          .filter((post): post is Post => Boolean(post))
+          .map(mapPostListItem);
+      });
+    },
+
+    async promoteDueScheduledPosts(now: Date = new Date()): Promise<number> {
+      return runWithDataSource(dataSourceFactory, async (dataSource) => {
+        const result = await dataSource
+          .createQueryBuilder()
+          .update(Post)
+          .set({ status: PostStatus.PUBLISHED })
+          .where("status = :status", { status: PostStatus.SCHEDULED })
+          .andWhere("published_at <= :now", { now })
+          .execute();
+
+        return result.affected ?? 0;
+      });
+    },
     async createPost({ authorId, input }: CreatePostParams): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
 
-      const saved = await dataSource.transaction(async (manager) => {
+      const record = await dataSource.transaction(async (manager) => {
         await assertAuthorExists(manager, authorId);
 
         const tags = await loadTagsByIdsOrThrow(manager, input.tagIds);
@@ -875,77 +968,95 @@ export function createPostService(
         return mapPostRecord(await loadPostRecordOrThrow(manager, savedPost.id));
       });
 
+      await persistPostEmbedding(dataSourceFactory, record);
+
       await maybeEnqueueNewsletter({
         shouldSend: input.sendNewsletter !== false,
-        becamePublished: saved.status === PostStatus.PUBLISHED,
-        postId: saved.id,
+        becamePublished: record.status === PostStatus.PUBLISHED,
+        postId: record.id,
         enqueue: newsletterEnqueue,
       });
 
-      return saved;
+      return record;
     },
 
     async updatePost({ postId, input }: UpdatePostParams): Promise<PostRecord> {
       const dataSource = await dataSourceFactory();
 
-      const { saved, becamePublished } = await dataSource.transaction(async (manager) => {
-        const postRepository = manager.getRepository(Post);
-        const existingPost = await loadPostRecordOrThrow(manager, postId);
-        const wasPublished = existingPost.status === PostStatus.PUBLISHED;
-        const tags =
-          input.tagIds === undefined
-            ? null
-            : await loadTagsByIdsOrThrow(manager, input.tagIds);
-        const publication = resolveUpdatePublicationState(existingPost, input);
-        const slug =
-          input.slug === undefined
-            ? existingPost.slug
-            : await resolveUniquePostSlug(manager, input.slug, existingPost.slug);
+      const { record, shouldRefreshEmbedding, becamePublished } = await dataSource.transaction(
+        async (manager) => {
+          const postRepository = manager.getRepository(Post);
+          const existingPost = await loadPostRecordOrThrow(manager, postId);
+          const wasPublished = existingPost.status === PostStatus.PUBLISHED;
+          const tags =
+            input.tagIds === undefined
+              ? null
+              : await loadTagsByIdsOrThrow(manager, input.tagIds);
+          const publication = resolveUpdatePublicationState(existingPost, input);
+          const slug =
+            input.slug === undefined
+              ? existingPost.slug
+              : await resolveUniquePostSlug(manager, input.slug, existingPost.slug);
+          const textChanged =
+            input.title !== undefined ||
+            input.excerpt !== undefined ||
+            input.contentMdx !== undefined;
+          const becamePublic =
+            isPublicFacingStatus(publication.status) &&
+            !isPublicFacingStatus(existingPost.status);
 
-        const updatedPost = postRepository.merge(existingPost, {
-          title: input.title ?? existingPost.title,
-          slug,
-          excerpt: input.excerpt === undefined ? existingPost.excerpt : input.excerpt,
-          contentMdx: input.contentMdx ?? existingPost.contentMdx,
-          coverImageUrl:
-            input.coverImageUrl === undefined
-              ? existingPost.coverImageUrl
-              : input.coverImageUrl,
-          status: publication.status,
-          publishedAt: publication.publishedAt,
-          readingTime:
-            input.contentMdx === undefined
-              ? existingPost.readingTime
-              : calculateReadingTimeFromMdx(input.contentMdx),
-          seoTitle: input.seoTitle === undefined ? existingPost.seoTitle : input.seoTitle,
-          seoDescription:
-            input.seoDescription === undefined
-              ? existingPost.seoDescription
-              : input.seoDescription,
-        });
+          const updatedPost = postRepository.merge(existingPost, {
+            title: input.title ?? existingPost.title,
+            slug,
+            excerpt: input.excerpt === undefined ? existingPost.excerpt : input.excerpt,
+            contentMdx: input.contentMdx ?? existingPost.contentMdx,
+            coverImageUrl:
+              input.coverImageUrl === undefined
+                ? existingPost.coverImageUrl
+                : input.coverImageUrl,
+            status: publication.status,
+            publishedAt: publication.publishedAt,
+            readingTime:
+              input.contentMdx === undefined
+                ? existingPost.readingTime
+                : calculateReadingTimeFromMdx(input.contentMdx),
+            seoTitle: input.seoTitle === undefined ? existingPost.seoTitle : input.seoTitle,
+            seoDescription:
+              input.seoDescription === undefined
+                ? existingPost.seoDescription
+                : input.seoDescription,
+          });
 
-        await postRepository.save(updatedPost);
+          await postRepository.save(updatedPost);
 
-        if (tags) {
-          await replacePostTags(manager, postId, tags);
+          if (tags) {
+            await replacePostTags(manager, postId, tags);
+          }
+
+          const mapped = mapPostRecord(await loadPostRecordOrThrow(manager, postId));
+
+          return {
+            record: mapped,
+            shouldRefreshEmbedding:
+              isPublicFacingStatus(publication.status) &&
+              (becamePublic || textChanged || !existingPost.embedding),
+            becamePublished: !wasPublished && mapped.status === PostStatus.PUBLISHED,
+          };
         }
+      );
 
-        const mapped = mapPostRecord(await loadPostRecordOrThrow(manager, postId));
-
-        return {
-          saved: mapped,
-          becamePublished: !wasPublished && mapped.status === PostStatus.PUBLISHED,
-        };
-      });
+      if (shouldRefreshEmbedding) {
+        await persistPostEmbedding(dataSourceFactory, record);
+      }
 
       await maybeEnqueueNewsletter({
         shouldSend: input.sendNewsletter !== false,
         becamePublished,
-        postId: saved.id,
+        postId: record.id,
         enqueue: newsletterEnqueue,
       });
 
-      return saved;
+      return record;
     },
 
     async deletePost(postId: string): Promise<void> {
@@ -960,6 +1071,39 @@ export function createPostService(
     async deletePostForAuthor(postId: string, authorId: string): Promise<void> {
       await this.getPostForAuthor(postId, authorId);
       await this.deletePost(postId);
+    },
+
+    async syncPublicPostEmbeddings(): Promise<{ updated: number; skipped: number }> {
+      return runWithDataSource(dataSourceFactory, async (dataSource) => {
+        const posts = await dataSource.getRepository(Post).find({
+          where: {
+            status: In([PostStatus.PUBLISHED, PostStatus.SCHEDULED]),
+          },
+          select: {
+            id: true,
+            title: true,
+            excerpt: true,
+            contentMdx: true,
+            status: true,
+            embedding: true,
+          },
+        });
+
+        let updated = 0;
+        let skipped = 0;
+
+        for (const post of posts) {
+          const didUpdate = await persistPostEmbedding(dataSourceFactory, post);
+
+          if (didUpdate) {
+            updated += 1;
+          } else {
+            skipped += 1;
+          }
+        }
+
+        return { updated, skipped };
+      });
     },
   };
 }

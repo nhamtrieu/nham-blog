@@ -92,6 +92,42 @@ test("validatePostCreateInput rejects publishedAt when the post remains a draft"
   });
 });
 
+test("validatePostCreateInput requires publishedAt for scheduled posts", () => {
+  const result = validatePostCreateInput({
+    title: "Scheduled post",
+    contentMdx: "# Later",
+    status: PostStatus.SCHEDULED,
+  });
+
+  assert.equal(result.success, false);
+
+  if (result.success) {
+    return;
+  }
+
+  assert.deepEqual(result.error.fields, {
+    publishedAt: ["Scheduled posts require a publish date."],
+  });
+});
+
+test("validatePostCreateInput accepts scheduled posts with a publish date", () => {
+  const result = validatePostCreateInput({
+    title: "Scheduled post",
+    contentMdx: "# Later",
+    status: PostStatus.SCHEDULED,
+    publishedAt: "2026-12-01T10:00:00.000Z",
+  });
+
+  assert.equal(result.success, true);
+
+  if (!result.success) {
+    return;
+  }
+
+  assert.equal(result.data.status, PostStatus.SCHEDULED);
+  assert.equal(result.data.publishedAt?.toISOString(), "2026-12-01T10:00:00.000Z");
+});
+
 test("validatePostUpdateInput requires at least one field", () => {
   const result = validatePostUpdateInput({});
 

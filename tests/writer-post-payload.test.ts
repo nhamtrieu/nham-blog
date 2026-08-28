@@ -32,7 +32,7 @@ test("toWriterCreateInput always forces DRAFT and clears publishedAt", () => {
 test("toWriterUpdateInput strips status and publishedAt", () => {
   const validated = validatePostUpdateInput({
     title: "Updated title",
-    status: PostStatus.PUBLISHED,
+    status: PostStatus.SCHEDULED,
     publishedAt: new Date("2026-01-01T00:00:00.000Z"),
   });
 
@@ -47,4 +47,25 @@ test("toWriterUpdateInput strips status and publishedAt", () => {
   assert.equal("status" in writerInput, false);
   assert.equal("publishedAt" in writerInput, false);
   assert.equal(writerInput.title, "Updated title");
+});
+
+test("toWriterCreateInput forces DRAFT even when client sends SCHEDULED", () => {
+  const validated = validatePostCreateInput({
+    title: "Writer schedule attempt",
+    contentMdx: "# Hello",
+    status: PostStatus.SCHEDULED,
+    publishedAt: new Date("2026-12-01T00:00:00.000Z"),
+    tagIds: [],
+  });
+
+  assert.equal(validated.success, true);
+
+  if (!validated.success) {
+    return;
+  }
+
+  const writerInput = toWriterCreateInput(validated.data);
+
+  assert.equal(writerInput.status, PostStatus.DRAFT);
+  assert.equal(writerInput.publishedAt, null);
 });

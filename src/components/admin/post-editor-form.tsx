@@ -79,6 +79,7 @@ type PostEditorFormValues = {
   contentMdx: string;
   coverImageUrl: string;
   status: PostStatus;
+  scheduledAt: string;
   seoTitle: string;
   seoDescription: string;
   tagIds: string[];
@@ -148,6 +149,11 @@ const statusOptions = [
     value: PostStatus.DRAFT,
   },
   {
+    label: "Scheduled (Lên lịch)",
+    hint: "Công khai vào thời điểm đã chọn",
+    value: PostStatus.SCHEDULED,
+  },
+  {
     label: "Published (Công khai)",
     hint: "Công khai ngay sau khi lưu",
     value: PostStatus.PUBLISHED,
@@ -155,6 +161,22 @@ const statusOptions = [
 ] as const;
 
 const AUTO_SAVE_DEBOUNCE_MS = 1200;
+
+function toDatetimeLocalValue(iso: string | null | undefined) {
+  if (!iso) {
+    return "";
+  }
+
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function createInitialFormValues(initialData?: PostEditorInitialData): PostEditorFormValues {
   return {
@@ -164,6 +186,10 @@ function createInitialFormValues(initialData?: PostEditorInitialData): PostEdito
     contentMdx: initialData?.contentMdx ?? "",
     coverImageUrl: initialData?.coverImageUrl ?? "",
     status: initialData?.status ?? PostStatus.DRAFT,
+    scheduledAt:
+      initialData?.status === PostStatus.SCHEDULED
+        ? toDatetimeLocalValue(initialData.publishedAt)
+        : "",
     seoTitle: initialData?.seoTitle ?? "",
     seoDescription: initialData?.seoDescription ?? "",
     tagIds: initialData?.tagIds ?? [],
@@ -185,6 +211,24 @@ function createSavePayload(formValues: PostEditorFormValues, omitPublishFields =
 
   if (omitPublishFields) {
     return payload;
+  }
+
+  if (formValues.status === PostStatus.SCHEDULED) {
+    return {
+      ...payload,
+      status: formValues.status,
+      publishedAt: formValues.scheduledAt
+        ? new Date(formValues.scheduledAt).toISOString()
+        : null,
+    };
+  }
+
+  if (formValues.status === PostStatus.DRAFT) {
+    return {
+      ...payload,
+      status: formValues.status,
+      publishedAt: null,
+    };
   }
 
   return {
@@ -267,7 +311,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
 }
 
 function getTogglePublishStatus(currentStatus: PostStatus) {
-  return currentStatus === PostStatus.PUBLISHED ? PostStatus.DRAFT : PostStatus.PUBLISHED;
+  return currentStatus === PostStatus.DRAFT ? PostStatus.PUBLISHED : PostStatus.DRAFT;
 }
 
 function Field({
@@ -647,6 +691,69 @@ export function PostEditorForm({
     const nextFormValues = {
       ...formValues,
       status: nextStatus,
+      scheduledAt: nextStatus === PostStatus.DRAFT ? "" : formValues.scheduledAt,
+    };
+
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    await persistPost("manual", nextFormValues);
+  }
+
+  async function handleSchedulePublish() {
+    if (!formValues.scheduledAt) {
+      setFieldErrors({
+        scheduledAt: ["Chọn thời điểm xuất bản."],
+      });
+      setFormMessage("Scheduled posts require a publish date.");
+      return;
+    }
+
+    const scheduledDate = new Date(formValues.scheduledAt);
+
+    if (Number.isNaN(scheduledDate.getTime())) {
+      setFieldErrors({
+        scheduledAt: ["Thời điểm xuất bản không hợp lệ."],
+      });
+      return;
+    }
+
+    const nextFormValues = {
+      ...formValues,
+      status: PostStatus.SCHEDULED,
+      scheduledAt: formValues.scheduledAt,
+    };
+
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    await persistPost("manual", nextFormValues);
+  }
+
+  async function handleCancelSchedule() {
+    const nextFormValues = {
+      ...formValues,
+      status: PostStatus.DRAFT,
+      scheduledAt: "",
+    };
+
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    await persistPost("manual", nextFormValues);
+  }
+
+  async function handlePublishNow() {
+    const nextFormValues = {
+      ...formValues,
+      status: PostStatus.PUBLISHED,
+      scheduledAt: "",
     };
 
     if (autoSaveTimerRef.current !== null) {
@@ -1198,25 +1305,93 @@ export function PostEditorForm({
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       {formValues.status === PostStatus.PUBLISHED
                         ? "Unpublish sẽ đưa bài viết về Draft và xóa thời gian publish hiện tại."
-                        : "Publish sẽ công khai bài viết và đặt thời gian publish theo server rules."}
+                        : formValues.status === PostStatus.SCHEDULED
+                          ? `Bài sẽ công khai lúc ${formatDateTime(currentPost?.publishedAt ?? null)}. Worker sẽ đổi sang Published sau khi đến giờ.`
+                          : "Publish sẽ công khai ngay. Hoặc chọn thời điểm bên dưới để lên lịch."}
                     </p>
-                    <Button
-                      className={cn(
-                        "mt-4 w-full rounded-xl",
-                        formValues.status === PostStatus.PUBLISHED
-                          ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
-                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    <div className="mt-4 flex flex-col gap-2">
+                      {formValues.status === PostStatus.SCHEDULED ? (
+                        <>
+                          <Button
+                            className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                            disabled={isBusy}
+                            onClick={() => {
+                              void handlePublishNow();
+                            }}
+                            type="button"
+                          >
+                            {isSubmitting ? (
+                              <LoaderCircle className="size-4 animate-spin" />
+                            ) : (
+                              <Check className="size-4" />
+                            )}
+                            Publish ngay
+                          </Button>
+                          <Button
+                            className="w-full rounded-xl border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                            disabled={isBusy}
+                            onClick={() => {
+                              void handleCancelSchedule();
+                            }}
+                            type="button"
+                            variant="outline"
+                          >
+                            Hủy lịch
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          className={cn(
+                            "w-full rounded-xl",
+                            formValues.status === PostStatus.PUBLISHED
+                              ? "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                              : "bg-primary text-primary-foreground hover:bg-primary/90"
+                          )}
+                          disabled={isBusy}
+                          onClick={() => {
+                            void handleTogglePublish();
+                          }}
+                          type="button"
+                          variant={formValues.status === PostStatus.PUBLISHED ? "outline" : "default"}
+                        >
+                          {isSubmitting ? (
+                            <LoaderCircle className="size-4 animate-spin" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                          {formValues.status === PostStatus.PUBLISHED ? "Unpublish" : "Publish"}
+                        </Button>
                       )}
-                      disabled={isBusy}
-                      onClick={() => {
-                        void handleTogglePublish();
+                    </div>
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="scheduledAt" label="Lên lịch xuất bản" />
+                    <Input
+                      aria-invalid={Boolean(getFieldError("scheduledAt"))}
+                      disabled={isBusy || formValues.status === PostStatus.PUBLISHED}
+                      id="scheduledAt"
+                      min={toDatetimeLocalValue(new Date().toISOString())}
+                      onChange={(event) => {
+                        updateField("scheduledAt", event.target.value);
                       }}
-                      type="button"
-                      variant={formValues.status === PostStatus.PUBLISHED ? "outline" : "default"}
-                    >
-                      {isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
-                      {formValues.status === PostStatus.PUBLISHED ? "Unpublish" : "Publish"}
-                    </Button>
+                      type="datetime-local"
+                      value={formValues.scheduledAt}
+                    />
+                    <FieldError message={getFieldError("scheduledAt")} />
+                    {formValues.status !== PostStatus.PUBLISHED ? (
+                      <Button
+                        className="mt-3 w-full rounded-xl"
+                        disabled={isBusy || !formValues.scheduledAt}
+                        onClick={() => {
+                          void handleSchedulePublish();
+                        }}
+                        type="button"
+                        variant="secondary"
+                      >
+                        Lên lịch
+                      </Button>
+                    ) : null}
                     {formValues.status !== PostStatus.PUBLISHED &&
                     currentPost?.status !== PostStatus.PUBLISHED ? (
                       <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm leading-5 text-muted-foreground">
@@ -1238,7 +1413,18 @@ export function PostEditorForm({
                     <FieldLabel htmlFor="status" label="Trạng thái" />
                     <Select
                       onValueChange={(value) => {
-                        updateField("status", value as PostStatus);
+                        const nextStatus = value as PostStatus;
+                        setFormValues((current) => ({
+                          ...current,
+                          status: nextStatus,
+                          scheduledAt:
+                            nextStatus === PostStatus.SCHEDULED
+                              ? current.scheduledAt ||
+                                toDatetimeLocalValue(currentPost?.publishedAt)
+                              : nextStatus === PostStatus.DRAFT
+                                ? ""
+                                : current.scheduledAt,
+                        }));
                       }}
                       value={formValues.status}
                     >

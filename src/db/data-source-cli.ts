@@ -18,6 +18,8 @@ import { PostLikesSavesNotifications1776358311802 } from "@/db/migrations/177635
 import { EmailVerification1776358311803 } from "@/db/migrations/1776358311803-email-verification";
 import { PasswordReset1776358311804 } from "@/db/migrations/1776358311804-password-reset";
 import { Newsletter1776358311805 } from "@/db/migrations/1776358311805-newsletter";
+import { PostEmbedding1776358311806 } from "@/db/migrations/1776358311806-post-embedding";
+import { PostStatusScheduled1776358311807 } from "@/db/migrations/1776358311807-post-status-scheduled";
 
 type PostgresDataSourceOptions = Extract<DataSourceOptions, { type: "postgres" }>;
 
@@ -36,6 +38,8 @@ const migrationClasses = [
   EmailVerification1776358311803,
   PasswordReset1776358311804,
   Newsletter1776358311805,
+  PostStatusScheduled1776358311807,
+  PostEmbedding1776358311806,
 ];
 
 export function createCliDataSource(overrides: Partial<PostgresDataSourceOptions> = {}) {

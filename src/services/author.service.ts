@@ -1,10 +1,12 @@
-import { IsNull, Not } from "typeorm";
-
 import { initializeDataSource } from "@/db/data-source";
-import { Post, PostStatus } from "@/entities/post.entity";
+import { Post } from "@/entities/post.entity";
 import { PostLike } from "@/entities/post-like.entity";
 import { PostSave } from "@/entities/post-save.entity";
 import { User } from "@/entities/user.entity";
+import {
+  applyPublicVisibilityToQueryBuilder,
+  publicVisibilityWhere,
+} from "@/lib/post-publication";
 import {
   SERVICE_ERROR_CODES,
   ServiceError,
@@ -66,28 +68,27 @@ export function createAuthorService(dataSourceFactory: DataSourceFactory = initi
       const postRepository = dataSource.getRepository(Post);
       const publishedWhere = {
         authorId: normalizedId,
-        status: PostStatus.PUBLISHED,
-        publishedAt: Not(IsNull()),
+        ...publicVisibilityWhere(),
       };
 
       const [postCount, likeCount, saveCount] = await Promise.all([
         postRepository.count({ where: publishedWhere }),
-        dataSource
-          .getRepository(PostLike)
-          .createQueryBuilder("like")
-          .innerJoin("like.post", "post")
-          .where("post.authorId = :authorId", { authorId: normalizedId })
-          .andWhere("post.status = :status", { status: PostStatus.PUBLISHED })
-          .andWhere("post.publishedAt IS NOT NULL")
-          .getCount(),
-        dataSource
-          .getRepository(PostSave)
-          .createQueryBuilder("save")
-          .innerJoin("save.post", "post")
-          .where("post.authorId = :authorId", { authorId: normalizedId })
-          .andWhere("post.status = :status", { status: PostStatus.PUBLISHED })
-          .andWhere("post.publishedAt IS NOT NULL")
-          .getCount(),
+        applyPublicVisibilityToQueryBuilder(
+          dataSource
+            .getRepository(PostLike)
+            .createQueryBuilder("like")
+            .innerJoin("like.post", "post")
+            .where("post.authorId = :authorId", { authorId: normalizedId }),
+          "post"
+        ).getCount(),
+        applyPublicVisibilityToQueryBuilder(
+          dataSource
+            .getRepository(PostSave)
+            .createQueryBuilder("save")
+            .innerJoin("save.post", "post")
+            .where("post.authorId = :authorId", { authorId: normalizedId }),
+          "post"
+        ).getCount(),
       ]);
 
       return {

@@ -15,8 +15,11 @@ import { sendVerificationEmail } from "@/lib/email/send-verification-email";
 import { sendNewsletterConfirmEmail } from "@/lib/email/send-newsletter-confirm-email";
 import { newsletterService } from "@/services/newsletter.service";
 import { validateEnv } from "@/env";
+import { postService } from "@/services";
 
 validateEnv();
+
+const SCHEDULED_PUBLISH_POLL_MS = 60_000;
 
 async function closeAllRabbitMq() {
   await Promise.all([
@@ -26,8 +29,29 @@ async function closeAllRabbitMq() {
   ]);
 }
 
+async function promoteDueScheduledPosts() {
+  try {
+    const promoted = await postService.promoteDueScheduledPosts();
+
+    if (promoted > 0) {
+      console.log(`[scheduled-publish] promoted ${promoted} post(s)`);
+    }
+  } catch (error) {
+    console.error("[scheduled-publish] poll failed", error);
+  }
+}
+
 async function main() {
-  console.log("[email-worker] started (verification + password reset + newsletter)");
+  console.log("[email-worker] started (verification + password reset + newsletter + scheduled publish)");
+
+  await promoteDueScheduledPosts();
+  const scheduledPublishTimer = setInterval(() => {
+    void promoteDueScheduledPosts();
+  }, SCHEDULED_PUBLISH_POLL_MS);
+
+  if (typeof scheduledPublishTimer.unref === "function") {
+    scheduledPublishTimer.unref();
+  }
 
   await consumeVerificationEmails(async (message) => {
     console.log(`[email-verification] sending to ${message.email} (user ${message.userId})`);

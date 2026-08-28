@@ -12,6 +12,7 @@ import { getServerAuthSession } from "@/auth";
 import { CommentSection, type PublicCommentView } from "@/components/blog/comment-section";
 import { PostEngagementBar } from "@/components/blog/post-engagement-bar";
 import { PostTableOfContents } from "@/components/blog/post-table-of-contents";
+import { RelatedPosts } from "@/components/blog/related-posts";
 import { NewsletterSubscribeForm } from "@/components/newsletter/newsletter-subscribe-form";
 import { loadPublishedPostBySlug } from "@/app/blog/[slug]/load-published-post";
 import { env } from "@/env";
@@ -28,6 +29,7 @@ import {
   commentService,
   isServiceError,
   postEngagementService,
+  postService,
 } from "@/services";
 
 type BlogPostPageProps = {
@@ -312,9 +314,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   })();
   const { post, content, tocItems } = pageData;
   const postUrl = absoluteUrl(`/blog/${post.slug}`);
-  const [initialComments, session] = await Promise.all([
+  const [initialComments, session, relatedPosts] = await Promise.all([
     commentService.listApprovedCommentsForPostSlug({ slug: post.slug }),
     getServerAuthSession(),
+    postService.listRelatedPosts({ postId: post.id }),
   ]);
   const authenticated = isAuthenticatedSession(session);
   const engagement = await postEngagementService.getEngagementForPostSlug({
@@ -454,6 +457,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           ) : null}
 
           <div className="mt-8 border-t border-border pt-6">{content}</div>
+
+          <RelatedPosts posts={relatedPosts} />
 
           <section className="mt-10 rounded-2xl border border-border bg-muted/20 p-5 sm:p-6">
             <NewsletterSubscribeForm source="post" />

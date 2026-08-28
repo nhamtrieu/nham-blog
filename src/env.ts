@@ -46,6 +46,14 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().trim().min(1).optional(),
   /** Optional override for newsletter From; falls back to EMAIL_FROM. */
   NEWSLETTER_FROM: z.string().trim().min(1).optional(),
+  OPENAI_API_KEY: z.preprocess(
+    (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+    z.string().trim().min(1).optional()
+  ),
+  OPENAI_EMBEDDING_MODEL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+    z.string().trim().min(1).optional()
+  ),
 });
 
 function formatEnvErrors(error: z.ZodError) {
@@ -93,6 +101,8 @@ function parseEnv() {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     NEWSLETTER_FROM: process.env.NEWSLETTER_FROM,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL,
   });
 
   if (!parsed.success) {

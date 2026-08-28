@@ -1,9 +1,8 @@
-import { IsNull, Not } from "typeorm";
-
 import { initializeDataSource } from "@/db/data-source";
-import { Post, PostStatus } from "@/entities/post.entity";
+import { Post } from "@/entities/post.entity";
 import { PostLike } from "@/entities/post-like.entity";
 import { PostSave } from "@/entities/post-save.entity";
+import { publicVisibilityWhere } from "@/lib/post-publication";
 import {
   SERVICE_ERROR_CODES,
   ServiceError,
@@ -26,8 +25,7 @@ async function loadPublishedPostBySlug(
   const post = await dataSource.getRepository(Post).findOne({
     where: {
       slug,
-      status: PostStatus.PUBLISHED,
-      publishedAt: Not(IsNull()),
+      ...publicVisibilityWhere(),
     },
     select: {
       id: true,

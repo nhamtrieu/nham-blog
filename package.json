@@ -17,6 +17,7 @@
     "seed": "NODE_ENV=development node --env-file=.env.local --import tsx ./src/db/scripts/seed.ts",
     "admin:reset-password": "NODE_ENV=development node --env-file=.env.local --import tsx ./src/db/scripts/reset-admin-password.ts",
     "worker:email": "NODE_ENV=development node --env-file=.env.local --import tsx ./src/workers/email-verification.worker.ts",
+    "posts:embed": "NODE_ENV=development node --env-file=.env.local --import tsx ./src/db/scripts/embed-posts.ts",
     "shadcn": "shadcn"
   },
   "dependencies": {

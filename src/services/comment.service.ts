@@ -1,15 +1,14 @@
 import {
   Brackets,
   Equal,
-  IsNull,
   LessThan,
-  Not,
 } from "typeorm";
 
 import { initializeDataSource } from "@/db/data-source";
 import { Comment, CommentStatus } from "@/entities/comment.entity";
-import { Post, PostStatus } from "@/entities/post.entity";
+import { Post } from "@/entities/post.entity";
 import { User, UserRole } from "@/entities/user.entity";
+import { publicVisibilityWhere } from "@/lib/post-publication";
 import {
   SERVICE_ERROR_CODES,
   ServiceError,
@@ -160,8 +159,7 @@ async function loadPublishedPostBySlugOrThrow(manager: Awaited<ReturnType<DataSo
   const post = await postRepository.findOne({
     where: {
       slug,
-      status: PostStatus.PUBLISHED,
-      publishedAt: Not(IsNull()),
+      ...publicVisibilityWhere(),
     },
   });
 
